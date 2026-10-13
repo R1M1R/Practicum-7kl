@@ -699,16 +699,6 @@
     return Number(pack.best) / Number(pack.total);
   }
 
-  function weightedRatio(pairs) {
-    var sum = 0;
-    var weight = 0;
-    pairs.forEach(function (pair) {
-      sum += packRatio(pair[0]) * pair[1];
-      weight += pair[1];
-    });
-    return weight ? sum / weight : 0;
-  }
-
   function markFrom(score) {
     if (score >= 85) return 5;
     if (score >= 70) return 4;
@@ -724,36 +714,89 @@
     return '';
   }
 
+  function partScore(items) {
+    var got = 0;
+    var max = 0;
+    items.forEach(function (item) {
+      if (!item.on) return;
+      max += item.points;
+      got += item.points * item.ratio;
+    });
+    if (!max) return null;
+    return Math.round(100 * got / max);
+  }
+
+  function levelPart(id, points) {
+    return { on: isDone(id), points: points, ratio: packRatio(id) };
+  }
+
+  function countSlot(name, ids) {
+    var done = ids.filter(isDone).length;
+    return { name: name, text: done ? (done + ' из ' + ids.length) : 'ещё впереди' };
+  }
+
   function gradeReport() {
-    var g1 = weightedRatio([['not', 1], ['and', 1], ['or', 1], ['xor', 1]]);
-    var radar = packRatio('radar');
-    var g2 = weightedRatio([['impl', 1], ['eq', 1], ['mix', 1], ['exam', 2]]);
-    var tr = packRatio('translate');
-    var c1 = state.solved.c1 ? 1 : 0;
-    var c2 = state.solved.c2 ? 1 : 0;
-    var l1score = Math.round(100 * (25 * g1 + 10 * radar) / 35);
-    var l2score = Math.round(100 * (30 * g2 + 10 * tr + 15 * c1 + 10 * c2) / 65);
-    var finalScore = Math.round(0.35 * l1score + 0.65 * l2score);
-    var l1on = ['not', 'and', 'or', 'xor', 'radar'].some(isDone);
-    var l2on = ['impl', 'eq', 'mix', 'exam', 'translate'].some(isDone) || !!state.solved.c1 || !!state.solved.c2;
+    var l1items = ['not', 'and', 'or', 'xor'].map(function (id) {
+      return levelPart(id, 6.25);
+    }).concat([levelPart('radar', 10)]);
+    var l2items = [
+      levelPart('impl', 6),
+      levelPart('eq', 6),
+      levelPart('mix', 6),
+      levelPart('exam', 12),
+      levelPart('translate', 10),
+      { on: !!state.solved.c1, points: 15, ratio: state.solved.c1 ? 1 : 0 }
+    ];
+    var lesson1score = partScore(l1items);
+    var lesson2score = partScore(l2items);
+    var lesson1 = lesson1score == null ? null : markFrom(lesson1score);
+    var lesson2 = lesson2score == null ? null : markFrom(lesson2score);
+    var l1on = l1items.some(function (item) { return item.on; });
+    var l2on = l2items.some(function (item) { return item.on; }) || !!state.solved.c2;
     var gates1 = ['not', 'and', 'or', 'xor'].filter(isDone).length;
     var official = gates1 >= 3 && isDone('radar') && isDone('exam') && !!state.solved.c1 && isDone('translate');
+    var earned = 0;
+    l1items.concat(l2items).forEach(function (item) {
+      earned += item.points * (item.on ? item.ratio : 0);
+    });
+    var finalScore = Math.round(100 * earned / 90);
+    if (state.solved.c2) finalScore = Math.min(100, finalScore + 5);
+    var finalMark = official ? markFrom(finalScore) : null;
+    var hero = null;
+    var heroTitle = 'Оценка';
+    var heroNote = 'Цифра появится, как только закроешь первый шлюз.';
+    if (official) {
+      hero = finalMark;
+      heroTitle = 'Итоговая оценка';
+      heroNote = 'Можно ставить в журнал. Пятёрка — от 85, четвёрка — от 70, тройка — от 50. Дело 2, если успели, добавляет 5 баллов.';
+    } else if (l1on) {
+      hero = lesson1;
+      heroTitle = 'Оценка за 1-й урок';
+      heroNote = l2on
+        ? 'Итоговая появится после радара, зачёта, переводчика и дела 1. Пока второй урок эту цифру не портит.'
+        : 'Считаются только закрытые части. Шлюзы, до которых ещё не дошёл, оценку не снижают.';
+    } else if (l2on) {
+      hero = lesson2;
+      heroTitle = 'Пока за 2-й урок';
+      heroNote = 'Первый урок ещё не начат. Итоговая встанет, когда закроешь обязательные части обоих уроков.';
+    }
     return {
       phase: (!l1on && !l2on) ? 'none' : (l2on ? 'course' : 'lesson1'),
       official: official,
-      lesson1: l1on ? markFrom(l1score) : null,
-      lesson2: l2on ? markFrom(l2score) : null,
-      finalMark: l2on ? markFrom(finalScore) : null,
-      l1score: l1score,
-      l2score: l2score,
-      finalScore: finalScore,
+      lesson1: lesson1,
+      lesson2: lesson2,
+      hero: hero,
+      heroTitle: heroTitle,
+      heroNote: heroNote,
+      finalMark: finalMark,
+      finalScore: official ? finalScore : null,
       slots: [
-        { name: 'Урок 1 · четыре шлюза', text: Math.round(25 * g1) + ' из 25' },
-        { name: 'Урок 1 · радар', text: Math.round(10 * radar) + ' из 10' },
-        { name: 'Урок 2 · шлюзы и зачёт', text: Math.round(30 * g2) + ' из 30' },
-        { name: 'Урок 2 · переводчик', text: Math.round(10 * tr) + ' из 10' },
-        { name: 'Дело 1', text: Math.round(15 * c1) + ' из 15' },
-        { name: 'Дело 2 · бонус', text: Math.round(10 * c2) + ' из 10' }
+        countSlot('Урок 1 · шлюзы', ['not', 'and', 'or', 'xor']),
+        { name: 'Урок 1 · радар', text: isDone('radar') ? (Math.round(10 * packRatio('radar')) + ' из 10') : 'ещё впереди' },
+        countSlot('Урок 2 · шлюзы и зачёт', ['impl', 'eq', 'mix', 'exam']),
+        { name: 'Урок 2 · переводчик', text: isDone('translate') ? (Math.round(10 * packRatio('translate')) + ' из 10') : 'ещё впереди' },
+        { name: 'Дело 1', text: state.solved.c1 ? 'закрыто' : 'ещё впереди' },
+        { name: 'Дело 2 · бонус', text: state.solved.c2 ? '+5 к итогу' : 'если останется время' }
       ]
     };
   }
@@ -987,7 +1030,7 @@
 
   function checklistHtml() {
     var g = gradeReport();
-    var mark = g.phase === 'course' ? g.finalMark : g.lesson1;
+    var mark = g.official ? g.finalMark : g.hero;
     var items = [
       { tab: 'base', title: 'Протокол', status: state.handbook ? 'открыт' : 'раскрой карточку', ok: state.handbook },
       { tab: 'train', title: 'Урок 1', status: lessonCount(['not', 'and', 'or', 'xor', 'radar']), ok: lessonCount(['not', 'and', 'or', 'xor', 'radar']).indexOf('5 /') === 0 },
@@ -1004,9 +1047,7 @@
     var mins = sessionMinutes();
     var clock = mins >= 1 ? '<p class="note">В эфире: ' + mins + ' мин</p>' : '';
     var g = gradeReport();
-    var stamp = '';
-    if (g.phase === 'lesson1' && g.lesson1) stamp = '<p class="kicker">Сейчас за 1-й урок: ' + g.lesson1 + ' · ' + markWord(g.lesson1) + '</p>';
-    else if (g.phase === 'course' && g.finalMark) stamp = '<p class="kicker">' + (g.official ? 'Итоговая оценка' : 'Промежуточная оценка') + ': ' + g.finalMark + ' · ' + markWord(g.finalMark) + '</p>';
+    var stamp = g.hero ? ('<p class="kicker">' + esc(g.heroTitle) + ': ' + g.hero + ' · ' + markWord(g.hero) + '</p>') : '';
     return '<div class="stack-lg">' + fileBanner() + problemBanner() +
       '<div><p class="kicker">Два урока</p><h1>Сервер НЕОН-7</h1><p class="lead">Школьный сервер хранит оценки. Ночью базу стёрли. За два занятия ты откроешь логические замки и вычислишь, кто это сделал. Оценка сама встанет на вкладке «Итог».</p>' + stamp + clock + '</div>' +
       '<div class="auto-grid"><section class="card is-cyan"><p class="kicker">Урок 1</p><h2>Базовые операции</h2><p class="lead">НЕ, И, ИЛИ, XOR. Потом радар: по таблице узнать, чья она.</p><p class="note">' + lessonCount(['not', 'and', 'or', 'xor', 'radar']) + '</p><button type="button" class="primary-btn" data-action="tab" data-tab="train">К шлюзам</button></section>' +
@@ -1315,21 +1356,16 @@
 
   function gradeHtml() {
     var g = gradeReport();
-    var hero = g.phase === 'course' ? g.finalMark : g.lesson1;
-    var title = g.phase === 'none' ? 'Оценка' : (g.phase === 'lesson1' ? 'Оценка за 1-й урок' : (g.official ? 'Итоговая оценка' : 'Промежуточная оценка'));
-    var note;
-    if (g.phase === 'none') note = 'Цифра появится, как только закроешь первый шлюз.';
-    else if (g.phase === 'lesson1') note = 'Это оценка только за первое занятие. Итог за оба урока встанет на следующем.';
-    else if (g.official) note = 'Можно ставить в журнал. Пятёрка — от 85 баллов, четвёрка — от 70, тройка — от 50.';
-    else note = 'Пока промежуточная: пустые части считаются нулём и тянут балл вниз. Закрой их — цифра вырастет.';
-    var digit = hero == null ? '—' : String(hero);
-    var word = hero == null ? '' : '<p class="lead">' + markWord(hero) + '</p>';
+    var digit = g.hero == null ? '—' : String(g.hero);
+    var word = g.hero == null ? '' : '<p class="lead">' + markWord(g.hero) + '</p>';
     var pair = '<div class="stat-grid"><section class="card"><span>Урок 1</span><strong class="mark-' + (g.lesson1 || 0) + '">' + (g.lesson1 || '—') + '</strong></section><section class="card"><span>Урок 2</span><strong class="mark-' + (g.lesson2 || 0) + '">' + (g.lesson2 || '—') + '</strong></section></div>';
     var slots = g.slots.map(function (slot) {
       return '<div class="mini-row"><span>' + esc(slot.name) + '</span><strong>' + esc(slot.text) + '</strong></div>';
     }).join('');
-    var scoreLine = g.phase === 'course' ? '<p class="note">Баллы за два урока: ' + g.finalScore + ' из 100. Первый урок весит 35, второй — 65.</p>' : '<p class="note">Баллы 1-го урока: ' + g.l1score + ' из 100.</p>';
-    return '<section class="card mark-hero' + (g.official ? ' is-green' : '') + '"><p class="kicker">' + title + '</p><p class="mark-digit mark-' + (hero || 0) + '">' + digit + '</p>' + word + '<p class="lead">' + note + '</p>' + scoreLine + pair + slots + '</section>';
+    var scoreLine = g.official
+      ? '<p class="note">В журнал: ' + g.finalScore + ' из 100.</p>'
+      : '<p class="note">Большая цифра — только за то, что уже закрыто.</p>';
+    return '<section class="card mark-hero' + (g.official ? ' is-green' : '') + '"><p class="kicker">' + esc(g.heroTitle) + '</p><p class="mark-digit mark-' + (g.hero || 0) + '">' + digit + '</p>' + word + '<p class="lead">' + esc(g.heroNote) + '</p>' + scoreLine + pair + slots + '</section>';
   }
 
   function finalHtml() {
@@ -1350,7 +1386,7 @@
       '<div><p class="kicker">Журнал агента</p><h1>' + esc(state.name) + '</h1><p class="lead">' + esc(rank.text) + '</p>' + clock + '</div>' +
       gradeHtml() +
       '<section class="card is-cyan"><p class="kicker">Звание</p><h2>' + esc(rank.title) + '</h2></section>' +
-      '<div class="stat-grid"><section class="card"><span>Опыт</span><strong>' + state.xp + '</strong></section><section class="card"><span>Точность шлюзов</span><strong>' + accText + '</strong></section><section class="card"><span>Шлюзы</span><strong>' + doneCount() + '/' + LEVELS.length + '</strong></section><section class="card"><span>Дела</span><strong>' + caseSolvedCount() + '/2</strong></section></div>' +
+      '<div class="stat-grid"><section class="card"><span>Опыт</span><strong>' + state.xp + '</strong></section><section class="card"><span>Точность шлюзов</span><strong>' + accText + '</strong></section><section class="card"><span>Маршрут</span><strong>' + pathIds().filter(isDone).length + '/' + pathIds().length + '</strong></section><section class="card"><span>Дела</span><strong>' + caseSolvedCount() + '/2</strong></section></div>' +
       '<section class="card is-green"><p class="kicker">Домашний канал</p><h2>Сообщение расшифровано</h2><p class="lead">Задание можно забрать в конце второго урока. Скопируй его в чат класса или в заметку.</p><pre class="hw">' + esc(homeworkText()) + '</pre><button type="button" class="primary-btn" data-action="copy-hw">Скопировать задание</button>' + (state.copyNote ? '<p class="note">' + esc(state.copyNote) + '</p>' : '') + '</section>' +
       '<div class="stack"><h2>Весь маршрут</h2><div class="auto-grid">' + levels + '</div></div>' +
       '<button type="button" class="ghost-btn" data-action="rename">Сменить позывной</button>' +
@@ -1870,8 +1906,53 @@
       console.error(problems.join('\n'));
       process.exit(1);
     }
+    state = blank();
+    function put(id, best, total) {
+      state.levels[id] = { stars: starsFor(best, total), best: best, total: total, done: true, passed: best >= needCount(total) };
+    }
+    function fillPerfect() {
+      pathIds().forEach(function (id) {
+        var level = levelById(id);
+        put(id, level.tasks.length, level.tasks.length);
+      });
+    }
+    put('not', 4, 4);
+    var early = gradeReport();
+    if (early.phase !== 'lesson1' || early.lesson1 !== 5 || early.finalMark != null || early.hero !== 5) {
+      problems.push('early grade ' + early.lesson1 + '/' + early.hero);
+    }
+    state = blank();
+    put('not', 2, 4);
+    if (gradeReport().lesson1 !== 3) problems.push('half gate ' + gradeReport().lesson1);
+    state = blank();
+    fillPerfect();
+    state.solved.c1 = true;
+    var perfect = gradeReport();
+    if (!perfect.official || perfect.finalMark !== 5 || perfect.finalScore !== 100) {
+      problems.push('perfect ' + perfect.official + ' ' + perfect.finalMark + ' ' + perfect.finalScore);
+    }
+    state.solved.c2 = true;
+    if (gradeReport().finalScore !== 100) problems.push('bonus cap');
+    state = blank();
+    fillPerfect();
+    state.levels.impl = { stars: 1, best: 1, total: 2, done: true, passed: false };
+    var mid = gradeReport();
+    if (mid.finalMark != null || mid.hero !== 5 || mid.phase !== 'course') problems.push('mid course');
+    state = blank();
+    pathIds().forEach(function (id) {
+      var level = levelById(id);
+      var half = Math.ceil(level.tasks.length / 2);
+      put(id, half, level.tasks.length);
+    });
+    state.solved.c1 = true;
+    var low = gradeReport();
+    if (!low.official || low.finalMark !== 3) problems.push('low official ' + low.finalMark + ' ' + low.finalScore);
     var cards = 0;
     LEVELS.forEach(function (level) { cards += level.tasks.length; });
+    if (problems.length) {
+      console.error(problems.join('\n'));
+      process.exit(1);
+    }
     console.log('selfCheck ok, cards ' + cards);
   }
 })();
