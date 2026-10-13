@@ -18,8 +18,10 @@
 * { box-sizing: border-box; }
 
 html {
+  height: 100%;
   font-size: 17px;
   -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
 }
 
 @media (max-width: 340px) {
@@ -32,8 +34,9 @@ html {
 
 body {
   margin: 0;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   background:
     radial-gradient(1200px 500px at 50% -10%, rgba(122, 239, 255, 0.08), transparent 50%),
     var(--bg);
@@ -47,18 +50,26 @@ body.demo .app {
 }
 
 .app {
+  position: fixed;
+  top: var(--app-top, 0px);
+  left: 0;
+  right: 0;
   width: min(100%, 480px);
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--app-h, 100dvh);
+  max-height: 100vh;
+  max-height: 100dvh;
+  max-height: var(--app-h, 100dvh);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(18, 28, 42, 0.55), rgba(7, 11, 16, 0.2) 28%, rgba(7, 11, 16, 0.92)),
     repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(122, 239, 255, 0.035) 28px),
     repeating-linear-gradient(90deg, transparent, transparent 27px, rgba(122, 239, 255, 0.035) 28px),
     var(--bg-2);
-  position: relative;
 }
 
 @media (min-width: 520px) {
@@ -76,18 +87,19 @@ button {
   cursor: pointer;
   border: 0;
   background: transparent;
+  /* manipulation: и прямой, и чуть косой жест листают список. scale на :active это ломал. */
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
 button:active,
 button.is-down {
-  transform: scale(0.97);
+  filter: brightness(1.18);
 }
 
 button:disabled {
   cursor: default;
-  transform: none;
+  filter: none;
   opacity: 0.48;
 }
 
@@ -107,6 +119,7 @@ button:disabled {
 }
 
 .topbar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -139,7 +152,7 @@ button:disabled {
   gap: 0.45rem;
 }
 
-.xp-pill, .sound-btn, .ghost-btn, .primary-btn, .answer-btn, .seg button, .nav-btn, .acc-head, .choice-card {
+.xp-pill, .sound-btn, .ghost-btn, .primary-btn, .answer-btn, .choice-answer, .seg button, .nav-btn, .acc-head, .choice-card {
   border-radius: 0.9rem;
 }
 
@@ -163,16 +176,25 @@ button:disabled {
   font-weight: 700;
 }
 
-.app-main {
-  flex: 1;
-  overflow: auto;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-  padding: 0.9rem 0.9rem 1.1rem;
+/* Одна прокрутка на весь урок. min-height: 0 нужен, иначе Safari,
+   Samsung Internet и встроенные браузеры не сжимают блок и жест пропадает. */
+.app-main,
+.boot {
+  flex: 1 1 0px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: manipulation;
+}
+
+.app-main {
+  padding: 0.9rem 0.9rem 1.1rem;
 }
 
 .bottom-nav {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   border-top: 1px solid rgba(122, 239, 255, 0.22);
@@ -258,7 +280,6 @@ h2 {
 }
 
 .boot {
-  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -266,7 +287,10 @@ h2 {
   padding: calc(1.2rem + env(safe-area-inset-top)) 1rem calc(1.2rem + env(safe-area-inset-bottom));
 }
 
-.boot.is-login { justify-content: center; }
+/* Центр, пока форма влезает. Если клавиатура её выше экрана — прижимается к верху и листается. */
+.boot.is-login { justify-content: flex-start; }
+.boot.is-login > :first-child { margin-top: auto; }
+.boot.is-login > :last-child { margin-bottom: auto; }
 
 .boot-log {
   list-style: none;
@@ -490,6 +514,55 @@ input::placeholder { color: #9fb6c9; }
 .answer-btn.zero { border: 2px solid var(--pink); color: var(--pink); }
 .answer-btn.one { border: 2px solid var(--green); color: var(--green); }
 
+.choice-answer {
+  width: 100%;
+  min-height: 3.4rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 0.9rem;
+  text-align: left;
+  border: 2px solid var(--line);
+  background: #0c141e;
+}
+
+.choice-answer .symbol {
+  font-size: 1.15rem;
+}
+
+.phrase {
+  margin: 0.15rem 0 0.85rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.auto-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.mark-hero { text-align: center; }
+.mark-hero .lead,
+.mark-hero .note { text-align: center; }
+.mark-hero .stat-grid,
+.mark-hero .mini-row { text-align: left; }
+
+.mark-digit {
+  margin: 0.1rem 0 0.2rem;
+  font-size: clamp(4rem, 18vw, 6rem);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+
+.mark-2 { color: var(--pink); }
+.mark-3 { color: #ffd56a; }
+.mark-4 { color: var(--cyan); }
+.mark-5 { color: var(--green); }
+
 /* Переворот карточки: уход в ребро и приход с другой стороны.
    Полный preserve-3d внутри прокручиваемого экрана телефона схлопывается,
    поэтому анимация собрана из двух поворотов rotateY. */
@@ -708,6 +781,31 @@ input::placeholder { color: #9fb6c9; }
 
 .mono {
   font-family: "Cascadia Mono", "Segoe UI Mono", ui-monospace, Consolas, monospace;
+}
+
+@media (min-width: 760px) {
+  .app,
+  body.demo .app {
+    width: min(100%, 920px);
+  }
+  .auto-grid { grid-template-columns: 1fr 1fr; }
+  .stat-grid { grid-template-columns: repeat(4, 1fr); }
+  .mark-hero .stat-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .nav-btn {
+    min-height: 2.75rem;
+    flex-direction: row;
+    gap: 0.35rem;
+    font-size: 0.95rem;
+  }
+  .nav-btn svg { width: 1.15rem; height: 1.15rem; }
+  .app-main { padding-top: 0.55rem; padding-bottom: 0.55rem; }
+  .bit { min-height: 3.4rem; min-width: 4.4rem; }
+  .bit strong { font-size: 1.7rem; }
+  .answer-btn { min-height: 3.2rem; }
+  .topbar { padding-top: calc(0.35rem + env(safe-area-inset-top)); padding-bottom: 0.35rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

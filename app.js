@@ -331,6 +331,88 @@
     }
   ];
 
+  LEVELS.forEach(function (level, index) { level.lesson = index < 4 ? 1 : 2; });
+  OPS.forEach(function (op, index) { op.lesson = index < 4 ? 1 : 2; });
+
+  var RADAR_CHOICES = [
+    { id: 'not', label: 'НЕ', symbol: '¬A' },
+    { id: 'and', label: 'И', symbol: 'A ∧ B' },
+    { id: 'or', label: 'ИЛИ', symbol: 'A ∨ B' },
+    { id: 'xor', label: 'XOR', symbol: 'A ⊕ B' }
+  ];
+
+  var FORM = {
+    and: { id: 'and', label: 'Оба', symbol: 'A ∧ B' },
+    or: { id: 'or', label: 'Хотя бы один', symbol: 'A ∨ B' },
+    xor: { id: 'xor', label: 'Ровно один', symbol: 'A ⊕ B' },
+    notA: { id: 'notA', label: 'Не Алиса', symbol: '¬A' },
+    impl: { id: 'impl', label: 'Если A, то B', symbol: 'A → B' },
+    eq: { id: 'eq', label: 'Одинаково', symbol: 'A ↔ B' },
+    nand: { id: 'nand', label: 'Не оба', symbol: '¬(A ∧ B)' },
+    nor: { id: 'nor', label: 'Ни одного', symbol: '¬(A ∨ B)' }
+  };
+
+  function forms(ids) {
+    return ids.map(function (id) { return FORM[id]; });
+  }
+
+  function radarRound(expr, why) {
+    return {
+      kind: 'choice',
+      answer: expr,
+      why: why,
+      prompt: 'Чья это таблица?',
+      unary: isUnary(expr),
+      rows: tableRows(expr, isUnary(expr)),
+      choices: RADAR_CHOICES
+    };
+  }
+
+  var ACTIVITIES = [
+    {
+      id: 'radar',
+      lesson: 1,
+      code: '1Б',
+      name: 'Радар',
+      symbol: 'узнай операцию',
+      minutes: 'около 8 мин',
+      blurb: 'Таблица без названия',
+      hint: 'Смотри, в каких строках стоит 1.',
+      afterword: 'Урок 1 можно закрывать: оценка за него уже лежит на вкладке «Итог». На следующем занятии — следование, переводчик и дело.',
+      tasks: [
+        radarRound('not', 'Тут нет второго входа. 0 стал 1, а 1 стал 0. Это НЕ.'),
+        radarRound('and', 'Единица только там, где оба входа равны 1. Это И.'),
+        radarRound('or', 'Ноль только в первой строке, когда оба входа 0. Это ИЛИ.'),
+        radarRound('xor', 'Единицы стоят там, где биты разные. Это XOR.'),
+        radarRound('and', 'Снова одна единица в самом низу. Оба ключа нужны — это И.'),
+        radarRound('or', 'Хватает одной единицы во входе, и результат уже 1. Это ИЛИ.'),
+        radarRound('xor', 'Две единицы подряд не дают 1. Совпавшие биты гасят XOR.'),
+        radarRound('not', 'Сигнал просто перевёрнут. Второго буквы нет — это НЕ.')
+      ]
+    },
+    {
+      id: 'translate',
+      lesson: 2,
+      code: '2Б',
+      name: 'Переводчик',
+      symbol: 'фраза → формула',
+      minutes: 'около 10 мин',
+      blurb: 'Слова в знаки',
+      hint: 'Сначала реши, речь про «оба», «хотя бы один» или «если… то…».',
+      afterword: 'Фраза и формула — одна мысль. Так читаются улики в деле.',
+      tasks: [
+        { kind: 'choice', prompt: 'В серверную зашли оба.', answer: 'and', why: '«Оба» — это И: A ∧ B.', choices: forms(['and', 'or', 'xor', 'eq']) },
+        { kind: 'choice', prompt: 'Хватит и одного пропуска.', answer: 'or', why: '«Хватит одного» — это ИЛИ: A ∨ B.', choices: forms(['or', 'and', 'xor', 'notA']) },
+        { kind: 'choice', prompt: 'Алисы у щитка не было.', answer: 'notA', why: 'Речь только про Алису и про «не». Это ¬A.', choices: forms(['notA', 'nand', 'nor', 'and']) },
+        { kind: 'choice', prompt: 'Рубильник нажал ровно один.', answer: 'xor', why: '«Ровно один» — это XOR, не обычное ИЛИ.', choices: forms(['xor', 'or', 'and', 'eq']) },
+        { kind: 'choice', prompt: 'Если тревога, то включается сирена.', answer: 'impl', why: '«Если… то…» — следование: A → B.', choices: forms(['impl', 'eq', 'or', 'and']) },
+        { kind: 'choice', prompt: 'Датчики показывают одно и то же.', answer: 'eq', why: 'Совпадение значений — эквивалентность: A ↔ B.', choices: forms(['eq', 'xor', 'and', 'impl']) },
+        { kind: 'choice', prompt: 'Они не могли быть виновны вместе.', answer: 'nand', why: '«Не оба» — это отрицание И: ¬(A ∧ B).', choices: forms(['nand', 'nor', 'notA', 'or']) },
+        { kind: 'choice', prompt: 'В комнате не было никого.', answer: 'nor', why: '«Ни одного» — отрицание ИЛИ: ¬(A ∨ B).', choices: forms(['nor', 'nand', 'notA', 'and']) }
+      ]
+    }
+  ];
+
   var CASES = [
     {
       id: 'c1',
@@ -407,6 +489,18 @@
     });
     OPS.forEach(function (op) {
       if (evalExpr(op.expr, 0, 1) === null) problems.push('op ' + op.id);
+    });
+    ACTIVITIES.forEach(function (level) {
+      level.tasks.forEach(function (task, index) {
+        var ids = task.choices.map(function (choice) { return choice.id; });
+        if (ids.indexOf(task.answer) < 0) problems.push(level.id + ' choice ' + index);
+        if (!task.why) problems.push(level.id + ' why ' + index);
+        if (task.rows) {
+          task.rows.forEach(function (row) {
+            if (evalExpr(task.answer, row.a, row.b || 0) !== row.v) problems.push(level.id + ' row ' + index);
+          });
+        }
+      });
     });
     return problems;
   }
@@ -505,8 +599,12 @@
   }
 
   function levelById(id) {
-    for (var i = 0; i < LEVELS.length; i += 1) {
+    var i;
+    for (i = 0; i < LEVELS.length; i += 1) {
       if (LEVELS[i].id === id) return LEVELS[i];
+    }
+    for (i = 0; i < ACTIVITIES.length; i += 1) {
+      if (ACTIVITIES[i].id === id) return ACTIVITIES[i];
     }
     return null;
   }
@@ -553,22 +651,25 @@
     }).length;
   }
 
+  function pathIds() {
+    return ['not', 'and', 'or', 'xor', 'radar', 'impl', 'eq', 'mix', 'exam', 'translate'];
+  }
+
   function recommendedId() {
-    for (var i = 0; i < LEVELS.length; i += 1) {
-      var pack = state.levels[LEVELS[i].id];
-      if (!pack || !pack.done) return LEVELS[i].id;
+    var ids = pathIds();
+    var i;
+    for (i = 0; i < ids.length; i += 1) {
+      var pack = state.levels[ids[i]];
+      if (!pack || !pack.done) return ids[i];
     }
     return '';
   }
 
   function nextLevel(id) {
-    var index = -1;
-    var i;
-    for (i = 0; i < LEVELS.length; i += 1) {
-      if (LEVELS[i].id === id) index = i;
-    }
-    if (index < 0 || index === LEVELS.length - 1) return null;
-    return LEVELS[index + 1];
+    var ids = pathIds();
+    var index = ids.indexOf(id);
+    if (index < 0 || index === ids.length - 1) return null;
+    return levelById(ids[index + 1]);
   }
 
   function accuracy() {
@@ -586,6 +687,75 @@
 
   function caseSolvedCount() {
     return (state.solved.c1 ? 1 : 0) + (state.solved.c2 ? 1 : 0);
+  }
+
+  function isDone(id) {
+    return !!(state.levels[id] && state.levels[id].done);
+  }
+
+  function packRatio(id) {
+    var pack = state.levels[id];
+    if (!pack || !pack.done || !pack.total) return 0;
+    return Number(pack.best) / Number(pack.total);
+  }
+
+  function weightedRatio(pairs) {
+    var sum = 0;
+    var weight = 0;
+    pairs.forEach(function (pair) {
+      sum += packRatio(pair[0]) * pair[1];
+      weight += pair[1];
+    });
+    return weight ? sum / weight : 0;
+  }
+
+  function markFrom(score) {
+    if (score >= 85) return 5;
+    if (score >= 70) return 4;
+    if (score >= 50) return 3;
+    return 2;
+  }
+
+  function markWord(mark) {
+    if (mark === 5) return 'отлично';
+    if (mark === 4) return 'хорошо';
+    if (mark === 3) return 'удовлетворительно';
+    if (mark === 2) return 'неудовлетворительно';
+    return '';
+  }
+
+  function gradeReport() {
+    var g1 = weightedRatio([['not', 1], ['and', 1], ['or', 1], ['xor', 1]]);
+    var radar = packRatio('radar');
+    var g2 = weightedRatio([['impl', 1], ['eq', 1], ['mix', 1], ['exam', 2]]);
+    var tr = packRatio('translate');
+    var c1 = state.solved.c1 ? 1 : 0;
+    var c2 = state.solved.c2 ? 1 : 0;
+    var l1score = Math.round(100 * (25 * g1 + 10 * radar) / 35);
+    var l2score = Math.round(100 * (30 * g2 + 10 * tr + 15 * c1 + 10 * c2) / 65);
+    var finalScore = Math.round(0.35 * l1score + 0.65 * l2score);
+    var l1on = ['not', 'and', 'or', 'xor', 'radar'].some(isDone);
+    var l2on = ['impl', 'eq', 'mix', 'exam', 'translate'].some(isDone) || !!state.solved.c1 || !!state.solved.c2;
+    var gates1 = ['not', 'and', 'or', 'xor'].filter(isDone).length;
+    var official = gates1 >= 3 && isDone('radar') && isDone('exam') && !!state.solved.c1 && isDone('translate');
+    return {
+      phase: (!l1on && !l2on) ? 'none' : (l2on ? 'course' : 'lesson1'),
+      official: official,
+      lesson1: l1on ? markFrom(l1score) : null,
+      lesson2: l2on ? markFrom(l2score) : null,
+      finalMark: l2on ? markFrom(finalScore) : null,
+      l1score: l1score,
+      l2score: l2score,
+      finalScore: finalScore,
+      slots: [
+        { name: 'Урок 1 · четыре шлюза', text: Math.round(25 * g1) + ' из 25' },
+        { name: 'Урок 1 · радар', text: Math.round(10 * radar) + ' из 10' },
+        { name: 'Урок 2 · шлюзы и зачёт', text: Math.round(30 * g2) + ' из 30' },
+        { name: 'Урок 2 · переводчик', text: Math.round(10 * tr) + ' из 10' },
+        { name: 'Дело 1', text: Math.round(15 * c1) + ' из 15' },
+        { name: 'Дело 2 · бонус', text: Math.round(10 * c2) + ' из 10' }
+      ]
+    };
   }
 
   function rankInfo() {
@@ -797,22 +967,33 @@
   }
 
   function handbookHtml() {
-    return OPS.map(function (op) {
-      var open = state.openAcc === op.id;
-      var body = open
-        ? '<div class="card"><p class="lead">' + esc(op.metaphor) + '</p><p class="lead"><strong>' + esc(op.rule) + '</strong></p><p class="callout">' + esc(op.trap) + '</p>' + playBlock(op) + '</div>'
-        : '';
-      return '<section class="acc"><button type="button" class="acc-head" data-action="acc" data-id="' + op.id + '" aria-expanded="' + (open ? 'true' : 'false') + '"><span><span class="acc-title">' + esc(op.name) + '</span><span class="symbol">' + esc(op.symbol) + ' · ' + esc(op.aka) + '</span></span><span class="chev" aria-hidden="true">' + (open ? '−' : '+') + '</span></button>' + body + '</section>';
+    return [1, 2].map(function (lesson) {
+      var title = lesson === 1 ? 'Урок 1 · НЕ, И, ИЛИ, XOR' : 'Урок 2 · следование и эквивалентность';
+      var blocks = OPS.filter(function (op) { return op.lesson === lesson; }).map(function (op) {
+        var open = state.openAcc === op.id;
+        var body = open
+          ? '<div class="card"><p class="lead">' + esc(op.metaphor) + '</p><p class="lead"><strong>' + esc(op.rule) + '</strong></p><p class="callout">' + esc(op.trap) + '</p>' + playBlock(op) + '</div>'
+          : '';
+        return '<section class="acc"><button type="button" class="acc-head" data-action="acc" data-id="' + op.id + '" aria-expanded="' + (open ? 'true' : 'false') + '"><span><span class="acc-title">' + esc(op.name) + '</span><span class="symbol">' + esc(op.symbol) + ' · ' + esc(op.aka) + '</span></span><span class="chev" aria-hidden="true">' + (open ? '−' : '+') + '</span></button>' + body + '</section>';
+      }).join('');
+      return '<h2>' + title + '</h2><div class="card">' + blocks + '</div>';
     }).join('');
   }
 
+  function lessonCount(ids) {
+    var done = ids.filter(isDone).length;
+    return done + ' / ' + ids.length;
+  }
+
   function checklistHtml() {
-    var gates = doneCount();
+    var g = gradeReport();
+    var mark = g.phase === 'course' ? g.finalMark : g.lesson1;
     var items = [
-      { tab: 'base', title: 'Протокол операций', status: state.handbook ? 'открыт' : 'раскрой карточку', ok: state.handbook },
-      { tab: 'train', title: 'Шлюзы', status: gates + ' / ' + LEVELS.length, ok: gates >= 6 },
-      { tab: 'case', title: 'Дело о базе', status: state.solved.c1 ? 'раскрыто' : 'ждёт', ok: !!state.solved.c1 },
-      { tab: 'final', title: 'Домашний канал', status: state.homeworkCopied ? 'скопирован' : 'забрать в конце', ok: state.homeworkCopied }
+      { tab: 'base', title: 'Протокол', status: state.handbook ? 'открыт' : 'раскрой карточку', ok: state.handbook },
+      { tab: 'train', title: 'Урок 1', status: lessonCount(['not', 'and', 'or', 'xor', 'radar']), ok: lessonCount(['not', 'and', 'or', 'xor', 'radar']).indexOf('5 /') === 0 },
+      { tab: 'train', title: 'Урок 2', status: lessonCount(['impl', 'eq', 'mix', 'exam', 'translate']), ok: isDone('exam') && isDone('translate') },
+      { tab: 'case', title: 'Дело', status: state.solved.c1 ? 'раскрыто' : 'второй урок', ok: !!state.solved.c1 },
+      { tab: 'final', title: 'Оценка', status: mark ? String(mark) : 'после старта', ok: g.official }
     ];
     return items.map(function (item) {
       return '<button type="button" class="check-item" data-action="tab" data-tab="' + item.tab + '"><span>' + item.title + '</span><span class="mark' + (item.ok ? '' : ' wait') + '">' + esc(item.status) + '</span></button>';
@@ -822,12 +1003,17 @@
   function baseHtml() {
     var mins = sessionMinutes();
     var clock = mins >= 1 ? '<p class="note">В эфире: ' + mins + ' мин</p>' : '';
+    var g = gradeReport();
+    var stamp = '';
+    if (g.phase === 'lesson1' && g.lesson1) stamp = '<p class="kicker">Сейчас за 1-й урок: ' + g.lesson1 + ' · ' + markWord(g.lesson1) + '</p>';
+    else if (g.phase === 'course' && g.finalMark) stamp = '<p class="kicker">' + (g.official ? 'Итоговая оценка' : 'Промежуточная оценка') + ': ' + g.finalMark + ' · ' + markWord(g.finalMark) + '</p>';
     return '<div class="stack-lg">' + fileBanner() + problemBanner() +
-      '<div><p class="kicker">Операция</p><h1>Сервер НЕОН-7</h1><p class="lead">Школьный сервер хранит оценки. Ночью базу стёрли, и система заперла двери логическими замками. Вспомни операции, прогони строки таблиц истинности и по уликам вычисли, кто это сделал.</p><p class="note">Ориентир на 45 минут: протокол около 8 минут, шлюзы около 25, дело около 10, в конце забери домашнее задание.</p>' + clock + '</div>' +
+      '<div><p class="kicker">Два урока</p><h1>Сервер НЕОН-7</h1><p class="lead">Школьный сервер хранит оценки. Ночью базу стёрли. За два занятия ты откроешь логические замки и вычислишь, кто это сделал. Оценка сама встанет на вкладке «Итог».</p>' + stamp + clock + '</div>' +
+      '<div class="auto-grid"><section class="card is-cyan"><p class="kicker">Урок 1</p><h2>Базовые операции</h2><p class="lead">НЕ, И, ИЛИ, XOR. Потом радар: по таблице узнать, чья она.</p><p class="note">' + lessonCount(['not', 'and', 'or', 'xor', 'radar']) + '</p><button type="button" class="primary-btn" data-action="tab" data-tab="train">К шлюзам</button></section>' +
+      '<section class="card"><p class="kicker">Урок 2</p><h2>Если, улики, оценка</h2><p class="lead">Следование, составные формулы, переводчик фраз и дело про Алису с Бобом.</p><p class="note">' + lessonCount(['impl', 'eq', 'mix', 'exam', 'translate']) + '</p><button type="button" class="ghost-btn" data-action="tab" data-tab="case">К делу</button></section></div>' +
       '<section class="card"><h2>План</h2>' + checklistHtml() + '</section>' +
-      '<div><h2>Протокол</h2><p class="lead">Нажми операцию, подвигай A и B и смотри подсвеченную строку. Это та же таблица истинности, только карточками.</p><div class="card">' + handbookHtml() + '</div></div>' +
-      '<p class="note">Разделы внизу. По пустому месту можно листать влево и вправо.</p>' +
-      '<p class="note">Телефон умеет открыть урок как приложение: меню браузера → «На экран Домой» или «Установить». Для урока хватит и обычной вкладки.</p>' +
+      '<div><h2>Протокол</h2><p class="lead">Нажми операцию, подвигай A и B и смотри подсвеченную строку. На первом уроке хватит верхних четырёх. Следование открой на втором.</p>' + handbookHtml() + '</div>' +
+      '<p class="note">Разделы внизу. На широком экране карточки встают в два столбца.</p>' +
       '<button type="button" class="ghost-btn" data-action="rename">Сменить позывной</button></div>';
   }
 
@@ -846,9 +1032,18 @@
   }
 
   function trainListHtml() {
-    var done = doneCount();
-    var width = Math.round(100 * done / LEVELS.length);
-    return '<div class="stack-lg"><div><p class="kicker">Тренажёр</p><h1>Шлюзы</h1><p class="lead">Каждая строка таблицы — отдельная карта. Жми 0 или 1. Карточка перевернётся и объяснит, почему так.</p><p class="note">Иди по порядку. Если читать пояснения, шлюзы занимают около 25 минут. Самое важное место урока — следование.</p><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="' + LEVELS.length + '" aria-valuenow="' + done + '"><span style="width:' + width + '%"></span></div><p class="note">Пройдено ' + done + ' из ' + LEVELS.length + '</p></div><div class="stack">' + LEVELS.map(levelButton).join('') + '</div></div>';
+    var done = pathIds().filter(isDone).length;
+    var width = Math.round(100 * done / pathIds().length);
+    function block(lesson) {
+      var levels = LEVELS.filter(function (level) { return level.lesson === lesson; });
+      var extras = ACTIVITIES.filter(function (level) { return level.lesson === lesson; });
+      var title = lesson === 1 ? 'Урок 1 · замки' : 'Урок 2 · если и улики';
+      var note = lesson === 1
+        ? 'Сначала четыре операции, в конце радар. Это целое занятие.'
+        : 'Следование — ключевой шлюз. Потом зачёт, переводчик и дело.';
+      return '<section class="stack"><h2>' + title + '</h2><p class="note">' + note + '</p><div class="auto-grid">' + levels.map(levelButton).join('') + extras.map(levelButton).join('') + '</div></section>';
+    }
+    return '<div class="stack-lg"><div><p class="kicker">Тренажёр</p><h1>Два урока</h1><p class="lead">На картах с 0 и 1 считаешь строку таблицы. Радар и переводчик устроены иначе: там нужно узнать операцию или формулу.</p><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="' + pathIds().length + '" aria-valuenow="' + done + '"><span style="width:' + width + '%"></span></div><p class="note">Пройдено ' + done + ' из ' + pathIds().length + '</p></div>' + block(1) + block(2) + '</div>';
   }
 
   function dotsHtml(index, total) {
@@ -878,21 +1073,64 @@
     return '<div class="answer-row no-swipe"><button type="button" class="answer-btn zero" data-action="pick" data-val="0"><span class="big">0</span><span class="cap">ложь</span></button><button type="button" class="answer-btn one" data-action="pick" data-val="1"><span class="big">1</span><span class="cap">истина</span></button></div>';
   }
 
+  function labelOf(task, id) {
+    var i;
+    if (!task.choices) return String(id);
+    for (i = 0; i < task.choices.length; i += 1) {
+      if (task.choices[i].id === id) return task.choices[i].label + ' · ' + task.choices[i].symbol;
+    }
+    return String(id);
+  }
+
+  function choiceButtons(task) {
+    return '<div class="stack no-swipe">' + task.choices.map(function (choice) {
+      return '<button type="button" class="choice-answer" data-action="pick" data-val="' + choice.id + '"><span class="acc-title">' + esc(choice.label) + '</span><span class="symbol">' + esc(choice.symbol) + '</span></button>';
+    }).join('') + '</div>';
+  }
+
+  function choiceAsk(level, task, locked) {
+    var body;
+    if (task.rows) {
+      body = '<p class="lead">' + esc(task.prompt) + '</p>' + task.rows.map(function (row) {
+        var left = task.unary ? ('A = ' + row.a) : ('A = ' + row.a + ', B = ' + row.b);
+        return '<div class="mini-row"><span>' + left + '</span><strong class="' + (row.v ? 'ok-text' : 'bad-text') + '">' + row.v + '</strong></div>';
+      }).join('');
+    } else {
+      body = '<p class="kicker">Фраза с канала</p><p class="phrase">' + esc(task.prompt) + '</p>';
+    }
+    var hint = level.hint ? '<p class="note">' + esc(level.hint) + '</p>' : '';
+    var controls = locked ? '<p class="lead">Сверяю ответ…</p>' : choiceButtons(task);
+    return '<div class="shake-wrap"><article class="card flip-card"><p class="kicker">' + esc(level.code) + ' · ' + esc(level.name) + ' · ' + (state.run.index + 1) + ' / ' + level.tasks.length + '</p>' + dotsHtml(state.run.index, level.tasks.length) + body + hint + controls + exitButton() + '</article></div>';
+  }
+
+  function choiceResult(level, task) {
+    var ok = state.run.pick === task.answer;
+    var last = state.run.index === level.tasks.length - 1;
+    var gain = state.run.gained ? '<p class="note">+' + state.run.gained + ' XP</p>' : '';
+    return '<article class="card flip-card is-in ' + (ok ? 'is-green' : 'is-pink') + '"><p class="verdict-word ' + (ok ? 'ok-text' : 'bad-text') + '">' + (ok ? 'ВЕРНО' : 'НЕВЕРНО') + '</p><p class="lead">Ты выбрал: ' + esc(labelOf(task, state.run.pick)) + '.</p><p class="formula">' + esc(labelOf(task, task.answer)) + '</p><p class="lead">' + esc(task.why) + '</p>' + gain + '<button type="button" class="primary-btn" data-action="next-card">' + (last ? 'К разбору' : 'Следующая карта') + '</button>' + exitButton() + '</article>';
+  }
+
   function askCard(level, locked) {
     var task = level.tasks[state.run.index];
+    if (task.kind === 'choice') return choiceAsk(level, task, locked);
     var extra = task.callout
       ? '<p class="callout">' + esc(task.callout) + '</p>'
       : (!level.hideHint && level.hint ? '<p class="lead">' + esc(level.hint) + '</p>' : '');
+    var coach = '';
+    if (state.run.misses.length && (level.id === 'impl' || task.expr === 'impl' || task.expr === 'impl_notB')) {
+      coach = '<p class="callout">После промаха: следование ложно только когда слева 1, а справа 0.</p>';
+    }
     var examNote = level.hideHint && state.run.index === 0
       ? '<p class="note">Зачёт без подсказки на карте. Нужно минимум ' + needCount(level.tasks.length) + ' из ' + level.tasks.length + '.</p>'
       : '';
     var streak = state.run.streak >= 2 ? '<p class="kicker">Серия ' + state.run.streak + '</p>' : '';
     var controls = locked ? '<p class="lead">Сверяю ответ…</p>' : answerButtons();
-    return '<div class="shake-wrap"><article class="card flip-card"><p class="kicker">' + esc(level.code) + ' · ' + esc(level.name) + ' · ' + (state.run.index + 1) + ' / ' + level.tasks.length + '</p>' + streak + dotsHtml(state.run.index, level.tasks.length) + examNote + bitsHtml(task) + '<p class="formula">' + esc(FORMULA[task.expr]) + '</p>' + extra + controls + exitButton() + '</article></div>';
+    return '<div class="shake-wrap"><article class="card flip-card"><p class="kicker">' + esc(level.code) + ' · ' + esc(level.name) + ' · ' + (state.run.index + 1) + ' / ' + level.tasks.length + '</p>' + streak + dotsHtml(state.run.index, level.tasks.length) + examNote + bitsHtml(task) + '<p class="formula">' + esc(FORMULA[task.expr]) + '</p>' + extra + coach + controls + exitButton() + '</article></div>';
   }
 
   function resultCard(level) {
     var task = level.tasks[state.run.index];
+    if (task.kind === 'choice') return choiceResult(level, task);
     var right = evalExpr(task.expr, task.a, task.b);
     var ok = state.run.pick === right;
     var last = state.run.index === level.tasks.length - 1;
@@ -916,6 +1154,9 @@
     }
     var cards = state.run.misses.map(function (miss) {
       var task = level.tasks[miss.index];
+      if (task.kind === 'choice') {
+        return '<article class="card is-pink"><h2>' + esc(task.prompt || FORMULA[task.answer] || level.name) + '</h2><p class="note">Ты выбрал ' + esc(labelOf(task, miss.pick)) + '. Верно: ' + esc(labelOf(task, task.answer)) + '.</p><p class="lead">' + esc(task.why) + '</p></article>';
+      }
       var right = evalExpr(task.expr, task.a, task.b);
       return '<article class="card is-pink"><h2>' + esc(FORMULA[task.expr]) + '</h2><p class="note">A = ' + bit(task.a) + (isUnary(task.expr) ? '' : ', B = ' + bit(task.b)) + '. Ты выбрал ' + miss.pick + ', верно ' + right + '.</p><p class="lead">' + esc(task.why) + '</p></article>';
     }).join('');
@@ -948,8 +1189,10 @@
 
   function attemptMessage(level, correct, total) {
     var need = needCount(total);
+    if (level.id === 'radar' && correct >= need) return 'Радар считает тебя своим. Оценка за первый урок уже на вкладке «Итог».';
+    if (level.id === 'translate' && correct >= need) return 'Фразы читаются. Можно идти в дело, если оно ещё открыто.';
     if (level.id === 'exam') {
-      if (correct >= need) return 'Зачёт сдан. Дальше — дело и домашнее задание.';
+      if (correct >= need) return 'Зачёт сдан. Дальше переводчик фраз, потом дело.';
       return 'Зачёт пока не сдан: нужно минимум ' + need + ' из ' + total + '. Разбор ниже, пересдача сразу.';
     }
     if (correct === total) return 'Шлюз открыт без единой ошибки.';
@@ -999,7 +1242,7 @@
       }
       return '<button type="button" class="choice-card' + (solved ? ' is-next' : '') + '" data-action="open-case" data-id="' + item.id + '">' + inner + '</button>';
     }).join('');
-    return '<div class="stack-lg"><div><p class="kicker">Кибер-детектив</p><h1>Дела</h1><p class="lead">Два подозреваемых, четыре комбинации — как четыре строки таблицы. Крути статусы, пока все улики не станут зелёными.</p><p class="note">Дело 1 — обязательная часть урока, около 8–10 минут. Дело 2 — если класс закончил раньше.</p></div>' + cards + '</div>';
+    return '<div class="stack-lg"><div><p class="kicker">Кибер-детектив · урок 2</p><h1>Дела</h1><p class="lead">Два подозреваемых, четыре комбинации — как четыре строки таблицы. Крути статусы, пока все улики не станут зелёными.</p><p class="note">Дело 1 входит в итоговую оценку. Дело 2 добавляет бонус, если осталось время. Учитель может открыть дело и раньше шлюзов.</p></div>' + cards + '</div>';
   }
 
   function verdictHtml(item) {
@@ -1070,30 +1313,52 @@
     return casePlayHtml(item);
   }
 
+  function gradeHtml() {
+    var g = gradeReport();
+    var hero = g.phase === 'course' ? g.finalMark : g.lesson1;
+    var title = g.phase === 'none' ? 'Оценка' : (g.phase === 'lesson1' ? 'Оценка за 1-й урок' : (g.official ? 'Итоговая оценка' : 'Промежуточная оценка'));
+    var note;
+    if (g.phase === 'none') note = 'Цифра появится, как только закроешь первый шлюз.';
+    else if (g.phase === 'lesson1') note = 'Это оценка только за первое занятие. Итог за оба урока встанет на следующем.';
+    else if (g.official) note = 'Можно ставить в журнал. Пятёрка — от 85 баллов, четвёрка — от 70, тройка — от 50.';
+    else note = 'Пока промежуточная: пустые части считаются нулём и тянут балл вниз. Закрой их — цифра вырастет.';
+    var digit = hero == null ? '—' : String(hero);
+    var word = hero == null ? '' : '<p class="lead">' + markWord(hero) + '</p>';
+    var pair = '<div class="stat-grid"><section class="card"><span>Урок 1</span><strong class="mark-' + (g.lesson1 || 0) + '">' + (g.lesson1 || '—') + '</strong></section><section class="card"><span>Урок 2</span><strong class="mark-' + (g.lesson2 || 0) + '">' + (g.lesson2 || '—') + '</strong></section></div>';
+    var slots = g.slots.map(function (slot) {
+      return '<div class="mini-row"><span>' + esc(slot.name) + '</span><strong>' + esc(slot.text) + '</strong></div>';
+    }).join('');
+    var scoreLine = g.phase === 'course' ? '<p class="note">Баллы за два урока: ' + g.finalScore + ' из 100. Первый урок весит 35, второй — 65.</p>' : '<p class="note">Баллы 1-го урока: ' + g.l1score + ' из 100.</p>';
+    return '<section class="card mark-hero' + (g.official ? ' is-green' : '') + '"><p class="kicker">' + title + '</p><p class="mark-digit mark-' + (hero || 0) + '">' + digit + '</p>' + word + '<p class="lead">' + note + '</p>' + scoreLine + pair + slots + '</section>';
+  }
+
   function finalHtml() {
     var rank = rankInfo();
     var mins = sessionMinutes();
     var clock = mins >= 1 ? '<p class="note">В эфире: ' + mins + ' мин</p>' : '';
     var acc = accuracy();
     var accText = acc === null ? '—' : (acc + '%');
-    var confetti = rank.top ? '<div class="confetti" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>' : '';
-    var levels = LEVELS.map(function (level) {
-      var pack = state.levels[level.id];
+    var g = gradeReport();
+    var confetti = (g.official && g.finalMark === 5) ? '<div class="confetti" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>' : '';
+    var levels = pathIds().map(function (id) {
+      var level = levelById(id);
+      var pack = state.levels[id];
       var status = pack && pack.done ? (starsLabel(pack.stars) + ' · ' + pack.best + '/' + pack.total) : 'не пройден';
-      return '<button type="button" class="choice-card" data-action="open-level" data-id="' + level.id + '"><span class="choice-top"><strong>' + esc(level.name) + '</strong><span class="stars">' + esc(status) + '</span></span></button>';
+      return '<button type="button" class="choice-card" data-action="open-level" data-id="' + id + '"><span class="choice-top"><strong>' + esc(level.name) + '</strong><span class="stars">' + esc(status) + '</span></span></button>';
     }).join('');
     return '<div class="stack-lg finale">' + confetti +
-      '<div><p class="kicker">Канал открыт</p><h1>Готово, ' + esc(state.name) + '</h1><p class="lead">' + esc(rank.text) + '</p>' + clock + '</div>' +
+      '<div><p class="kicker">Журнал агента</p><h1>' + esc(state.name) + '</h1><p class="lead">' + esc(rank.text) + '</p>' + clock + '</div>' +
+      gradeHtml() +
       '<section class="card is-cyan"><p class="kicker">Звание</p><h2>' + esc(rank.title) + '</h2></section>' +
-      '<div class="stat-grid"><section class="card"><span>Опыт</span><strong>' + state.xp + '</strong></section><section class="card"><span>Точность</span><strong>' + accText + '</strong></section><section class="card"><span>Шлюзы</span><strong>' + doneCount() + '/' + LEVELS.length + '</strong></section><section class="card"><span>Дела</span><strong>' + caseSolvedCount() + '/2</strong></section></div>' +
-      '<section class="card is-green"><p class="kicker">Домашний канал</p><h2>Сообщение расшифровано</h2><p class="lead">Задание уже можно забрать, даже если не все шлюзы зелёные. Скопируй его в чат класса или в заметку.</p><pre class="hw">' + esc(homeworkText()) + '</pre><button type="button" class="primary-btn" data-action="copy-hw">Скопировать задание</button>' + (state.copyNote ? '<p class="note">' + esc(state.copyNote) + '</p>' : '') + '</section>' +
-      '<div class="stack"><h2>Журнал шлюзов</h2>' + levels + '</div>' +
+      '<div class="stat-grid"><section class="card"><span>Опыт</span><strong>' + state.xp + '</strong></section><section class="card"><span>Точность шлюзов</span><strong>' + accText + '</strong></section><section class="card"><span>Шлюзы</span><strong>' + doneCount() + '/' + LEVELS.length + '</strong></section><section class="card"><span>Дела</span><strong>' + caseSolvedCount() + '/2</strong></section></div>' +
+      '<section class="card is-green"><p class="kicker">Домашний канал</p><h2>Сообщение расшифровано</h2><p class="lead">Задание можно забрать в конце второго урока. Скопируй его в чат класса или в заметку.</p><pre class="hw">' + esc(homeworkText()) + '</pre><button type="button" class="primary-btn" data-action="copy-hw">Скопировать задание</button>' + (state.copyNote ? '<p class="note">' + esc(state.copyNote) + '</p>' : '') + '</section>' +
+      '<div class="stack"><h2>Весь маршрут</h2><div class="auto-grid">' + levels + '</div></div>' +
       '<button type="button" class="ghost-btn" data-action="rename">Сменить позывной</button>' +
       '<button type="button" class="ghost-btn" data-action="reset">Сбросить прогресс на этом телефоне</button></div>';
   }
 
   function bootHtml() {
-    return '<section id="main" class="boot">' + fileBanner() + problemBanner() + '<div><p class="kicker">Информатика · 7 класс</p><h1 class="logo">NEON-7</h1><p class="lead">Практическая работа: логические операции и таблицы истинности.</p></div><ul class="boot-log"><li>&gt; канал защищён</li><li>&gt; протокол: логика</li><li>&gt; шлюзы ждут агента</li><li>&gt; допуск: псевдоним</li></ul><button type="button" class="primary-btn" data-action="to-login">Войти в систему</button></section>';
+    return '<section id="main" class="boot">' + fileBanner() + problemBanner() + '<div><p class="kicker">Информатика · 7 класс</p><h1 class="logo">NEON-7</h1><p class="lead">Практическая работа на два урока: логические операции и таблицы истинности.</p></div><ul class="boot-log"><li>&gt; канал защищён</li><li>&gt; протокол: логика</li><li>&gt; два урока, одна оценка</li><li>&gt; допуск: псевдоним</li></ul><button type="button" class="primary-btn" data-action="to-login">Войти в систему</button></section>';
   }
 
   function loginHtml() {
@@ -1101,7 +1366,7 @@
     var title = state.renaming ? 'Новый позывной' : 'Допуск агента';
     var submit = state.renaming ? 'Сохранить позывной' : 'Взломать систему';
     var value = state.renaming ? esc(state.name) : '';
-    return '<section id="main" class="boot is-login"><p class="logo">NEON-7</p><h1>' + title + '</h1><p class="lead">Впиши хакерский псевдоним. Система будет звать тебя так до конца урока, имя останется в этом телефоне.</p><form class="card stack" data-action="login-form"><label for="nick">Хакерский псевдоним</label><input id="nick" name="nick" type="text" maxlength="16" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="Например: Pixel" value="' + value + '" required><p class="form-error" id="login-error"></p><button class="primary-btn" type="submit">' + submit + '</button></form>' + back + '</section>';
+    return '<section id="main" class="boot is-login"><p class="logo">NEON-7</p><h1>' + title + '</h1><p class="lead">Впиши хакерский псевдоним. Так система будет звать тебя оба урока, имя останется в этом телефоне.</p><form class="card stack" data-action="login-form"><label for="nick">Хакерский псевдоним</label><input id="nick" name="nick" type="text" maxlength="16" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="Например: Pixel" value="' + value + '" required><p class="form-error" id="login-error"></p><button class="primary-btn" type="submit">' + submit + '</button></form>' + back + '</section>';
   }
 
   function tabHtml() {
@@ -1227,8 +1492,9 @@
     if (!state.run || state.run.phase !== 'ask') return;
     var level = levelById(state.run.levelId);
     var task = level.tasks[state.run.index];
-    var right = evalExpr(task.expr, task.a, task.b);
-    var chosen = Number(val) ? 1 : 0;
+    var choice = task.kind === 'choice';
+    var right = choice ? task.answer : evalExpr(task.expr, task.a, task.b);
+    var chosen = choice ? String(val) : (Number(val) ? 1 : 0);
     var ok = chosen === right;
     state.run.phase = 'result';
     state.run.pick = chosen;
@@ -1519,10 +1785,46 @@
     var tag = event.target && event.target.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     if (!state.run || state.run.phase !== 'ask' || state.tab !== 'train') return;
+    var task = levelById(state.run.levelId).tasks[state.run.index];
+    if (task.kind === 'choice') return;
     if (event.key === '0' || event.key === '1') {
       event.preventDefault();
       onPick(Number(event.key));
     }
+  }
+
+  function fitScreen() {
+    var view = window.visualViewport;
+    var height = view && view.height ? view.height : window.innerHeight;
+    var top = view && view.offsetTop ? view.offsetTop : 0;
+    height = Math.round(height);
+    top = Math.round(top);
+    if (height < 200) height = Math.round(window.innerHeight);
+    document.documentElement.style.setProperty('--app-h', height + 'px');
+    document.documentElement.style.setProperty('--app-top', top + 'px');
+  }
+
+  function onTouchMove(event) {
+    if (!swipe || !event.touches || !event.touches.length) return;
+    var touch = event.touches[0];
+    var dx = touch.clientX - swipe.x;
+    var dy = touch.clientY - swipe.y;
+    if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) swipe = null;
+  }
+
+  function onWheel(event) {
+    var main = document.getElementById('main');
+    if (!main || main.contains(event.target)) return;
+    if (main.scrollHeight <= main.clientHeight + 1) return;
+    main.scrollTop += event.deltaY;
+  }
+
+  function onFocusIn(event) {
+    var node = event.target;
+    if (!node || node.tagName !== 'INPUT') return;
+    window.setTimeout(function () {
+      if (typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'center' });
+    }, 320);
   }
 
   function init() {
@@ -1541,8 +1843,21 @@
     app.addEventListener('pointerup', onUp);
     app.addEventListener('pointercancel', onUp);
     app.addEventListener('touchstart', onTouchStart, { passive: true });
+    app.addEventListener('touchmove', onTouchMove, { passive: true });
     app.addEventListener('touchend', onTouchEnd, { passive: true });
+    app.addEventListener('focusin', onFocusIn);
     document.addEventListener('keydown', onKey);
+    document.addEventListener('wheel', onWheel, { passive: true });
+    fitScreen();
+    window.addEventListener('resize', fitScreen);
+    window.addEventListener('orientationchange', function () {
+      fitScreen();
+      window.setTimeout(fitScreen, 280);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', fitScreen);
+      window.visualViewport.addEventListener('scroll', fitScreen);
+    }
     render();
     registerSW();
   }
