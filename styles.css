@@ -152,7 +152,124 @@ button:disabled {
   gap: 0.45rem;
 }
 
-.xp-pill, .sound-btn, .ghost-btn, .primary-btn, .answer-btn, .choice-answer, .seg button, .nav-btn, .acc-head, .choice-card {
+.badge.is-hot {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.choice-card.is-locked {
+  opacity: 0.72;
+}
+
+.stamp {
+  display: inline-block;
+  margin-top: 0.35rem;
+  border: 2px solid var(--green);
+  color: var(--green);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.45rem;
+  transform: rotate(-6deg);
+}
+
+.stamp.is-big {
+  font-size: 1.35rem;
+  padding: 0.35rem 0.7rem;
+}
+
+.version-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.version-card {
+  min-height: 6.4rem;
+  text-align: left;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.95rem;
+  border: 2px solid rgba(122, 239, 255, 0.4);
+  background:
+    linear-gradient(160deg, rgba(24, 48, 72, 0.55), transparent 42%),
+    linear-gradient(180deg, #152033, #0c141e);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+}
+
+.version-card.is-on {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px rgba(93, 255, 176, 0.45), 0 0 22px rgba(93, 255, 176, 0.22);
+}
+
+.who-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+
+.who-row i {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-weight: 800;
+  border: 2px solid var(--cyan);
+  color: var(--cyan);
+}
+
+.who-row i.is-hot {
+  border-color: var(--pink);
+  background: rgba(255, 107, 157, 0.28);
+  color: #ffe3ee;
+}
+
+.meter {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.meter i {
+  flex: 1;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 107, 157, 0.28);
+  display: block;
+}
+
+.meter i.is-on {
+  background: linear-gradient(90deg, var(--cyan), var(--green));
+  box-shadow: 0 0 10px rgba(93, 255, 176, 0.45);
+}
+
+.row-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.row-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 3.1rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(255, 107, 157, 0.45);
+  background: rgba(40, 12, 24, 0.35);
+}
+
+.row-line.is-live {
+  border-color: var(--green);
+  background: rgba(93, 255, 176, 0.12);
+}
+
+.xp-pill, .sound-btn, .ghost-btn, .primary-btn, .answer-btn, .choice-answer, .seg button, .nav-btn, .acc-head, .choice-card, .version-card {
   border-radius: 0.9rem;
 }
 

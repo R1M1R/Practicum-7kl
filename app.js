@@ -39,7 +39,7 @@
   };
 
   function bit(value) {
-    return value ? 1 : 0;
+    return Number(value) ? 1 : 0;
   }
 
   /* Единый калькулятор. Учебные карточки и улики считают результат здесь. */
@@ -419,8 +419,10 @@
       code: 'Дело 01',
       title: 'Кто стёр базу?',
       bonus: false,
-      lead: 'Ночью с сервера НЕОН-7 исчезли оценки. В серверную могли войти только Алиса и Боб. Поставь каждому статус: 1 — виновен, 0 — невиновен.',
-      closing: 'Смотри, какие улики ломают остальные три строки. Это и есть таблица истинности дела.',
+      place: 'Серверная · 02:14',
+      hook: 'Оценки исчезли. В коридоре только две карты доступа.',
+      lead: 'Ночью с сервера НЕОН-7 стёрли оценки. В серверную могли войти только Алиса и Боб. Выбери одну версию ночи — это одна строка таблицы. Улики скажут, жива она или нет.',
+      closing: 'Три другие версии отпали. Живая строка и есть решение: таблица истинности этого дела.',
       clues: [
         { expr: 'or', text: 'В серверной был хотя бы один из них.' },
         { expr: 'nand', text: 'Двойного входа нет: они не виновны вдвоём.' },
@@ -433,8 +435,10 @@
       code: 'Дело 02',
       title: 'Кто выключил камеры?',
       bonus: true,
-      lead: 'Камеры погасли позже. Это отдельное дело: не переноси ответ из первой истории. Формулы другие, и виновным может оказаться другой человек.',
-      closing: 'Сравни с первым делом. Те же двое, другие улики — и вывод тоже другой.',
+      place: 'Щиток камер · 02:41',
+      hook: 'Свет погас позже. Не копируй вывод из первого дела.',
+      lead: 'Камеры погасли позже. Это отдельная история: те же двое, другие улики. Версия, которая закрыла первое дело, здесь может развалиться.',
+      closing: 'Сравни с первым делом. Те же имена, другая живая строка.',
       clues: [
         { expr: 'xor', text: 'Рубильник камер нажал ровно один человек.' },
         { expr: 'notA', text: 'Алиса в это время писала в чат класса — у щитка её не было.' },
@@ -485,6 +489,16 @@
       item.clues.forEach(function (clue) {
         if (!known[clue.expr]) problems.push('clue formula ' + clue.expr);
         if (evalExpr(clue.expr, 0, 0) === null) problems.push('eval ' + clue.expr);
+        [[0, 0], [0, 1], [1, 0], [1, 1]].forEach(function (pair) {
+          var good = evalExpr(clue.expr, pair[0], pair[1]) === 1;
+          var voice = clueVoice(clue.expr, pair[0], pair[1], good);
+          if (!voice || voice.length < 8) problems.push('voice ' + clue.expr);
+        });
+      });
+      var drills = drillTasks(item);
+      if (drills.length !== 2) problems.push('drill ' + item.id);
+      drills.forEach(function (task, index) {
+        if (evalExpr(task.expr, task.a, task.b) !== task.expect) problems.push('drill expect ' + item.id + index);
       });
     });
     OPS.forEach(function (op) {
@@ -527,6 +541,7 @@
       armExit: false,
       hint: false,
       caseGain: 0,
+      drill: null,
       copyNote: '',
       problemCount: 0
     };
@@ -1253,8 +1268,40 @@
     return askCard(level, state.run.phase !== 'ask');
   }
 
+  var NIGHTS = [
+    { a: 0, b: 0, title: 'Никого', line: 'Оба невиновны' },
+    { a: 0, b: 1, title: 'Только Боб', line: 'Алиса чиста' },
+    { a: 1, b: 0, title: 'Только Алиса', line: 'Боб чист' },
+    { a: 1, b: 1, title: 'Оба сразу', line: 'Виновны вместе' }
+  ];
+
   function describe(a, b) {
     return (a ? 'Алиса виновна' : 'Алиса невиновна') + ', ' + (b ? 'Боб виновен' : 'Боб невиновен');
+  }
+
+  function clueVoice(expr, a, b, good) {
+    var A = bit(a);
+    var B = bit(b);
+    if (good) {
+      if (expr === 'or') return 'Кто-то из двоих на месте. «Хотя бы один» сходится.';
+      if (expr === 'nand') return 'Вдвоём их в этой версии нет. Улика держится.';
+      if (expr === 'implBA') return 'Нет пары «Боб виновен, а Алиса нет». Следование цело.';
+      if (expr === 'A') return 'Алиса в этой версии есть. Отпечаток сходится.';
+      if (expr === 'xor') return 'Виновен ровно один. Рубильник сходится.';
+      if (expr === 'notA') return 'Алисы у щитка нет — как написано в чате.';
+      if (expr === 'impl_notA_B') return 'Раз Алисы нет, Боб в версии есть. «Если… то…» живо.';
+      if (expr === 'not_eq') return 'Один виновен, другой нет. Показания и правда разные.';
+      return 'Формула сейчас равна 1.';
+    }
+    if (expr === 'or') return 'Оба по нулям. «Хотя бы один» здесь ложь.';
+    if (expr === 'nand') return 'Оба виновны сразу, а улика запрещает двоих.';
+    if (expr === 'implBA') return 'Боб виновен, Алиса нет. Следование B → A так не живёт.';
+    if (expr === 'A') return 'Отпечаток Алисы есть, а в этой версии её не было.';
+    if (expr === 'xor') return A === B ? 'Сейчас оба одинаковые. «Ровно один» не сходится.' : 'Эта пара для XOR не сходится.';
+    if (expr === 'notA') return 'В версии Алиса у щитка, а чат говорит, что её там не было.';
+    if (expr === 'impl_notA_B') return 'Алиса невиновна и Боб тоже. «Если не Алиса, то Боб» ломается.';
+    if (expr === 'not_eq') return 'Показания совпали, а улика ждёт разные.';
+    return 'Формула сейчас равна 0. Версия спорит с уликой.';
   }
 
   function sameCombo(id) {
@@ -1275,31 +1322,83 @@
     var cards = CASES.map(function (item) {
       var locked = item.id === 'c2' && !state.solved.c1;
       var solved = !!state.solved[item.id];
-      var badge = item.bonus ? '<span class="badge">бонус</span>' : '';
-      var status = solved ? '<span class="stars">раскрыто</span>' : '<span class="note">4 улики</span>';
-      var inner = '<span class="choice-top"><strong>' + esc(item.code) + '</strong>' + badge + '</span><span class="acc-title">' + esc(item.title) + '</span><span class="note">' + esc(item.lead) + '</span>' + status;
+      var badge = item.bonus ? '<span class="badge">бонус</span>' : '<span class="badge is-hot">в оценку</span>';
+      var status = solved ? '<span class="stamp">закрыто</span>' : '<span class="note">4 улики · 4 версии ночи</span>';
+      var inner = '<span class="choice-top"><strong>' + esc(item.code) + '</strong>' + badge + '</span><span class="acc-title">' + esc(item.title) + '</span><span class="kicker">' + esc(item.place) + '</span><span class="note">' + esc(item.hook) + '</span>' + status;
       if (locked) {
-        return '<div class="choice-card">' + inner + '<span class="note">Откроется, когда закроешь дело 1. Если время вышло — бонус можно не брать.</span></div>';
+        return '<div class="choice-card is-locked">' + inner + '<span class="note">Сначала закрой дело 1. Если время вышло — бонус можно не брать.</span></div>';
       }
-      return '<button type="button" class="choice-card' + (solved ? ' is-next' : '') + '" data-action="open-case" data-id="' + item.id + '">' + inner + '</button>';
+      return '<button type="button" class="choice-card' + (solved ? ' is-next' : '') + '" data-action="open-case" data-id="' + item.id + '">' + inner + '<span class="symbol">' + (solved ? 'Открыть протокол' : 'Открыть досье') + '</span></button>';
     }).join('');
-    return '<div class="stack-lg"><div><p class="kicker">Кибер-детектив · урок 2</p><h1>Дела</h1><p class="lead">Два подозреваемых, четыре комбинации — как четыре строки таблицы. Крути статусы, пока все улики не станут зелёными.</p><p class="note">Дело 1 входит в итоговую оценку. Дело 2 добавляет бонус, если осталось время. Учитель может открыть дело и раньше шлюзов.</p></div>' + cards + '</div>';
+    return '<div class="stack-lg"><div><p class="kicker">Ночной канал · урок 2</p><h1>Досье</h1><p class="lead">Два подозреваемых и четыре версии ночи. Каждая версия — строка таблицы истинности. Улики подсвечивают, какая строка живая.</p><p class="note">Дело 1 входит в итоговую оценку. Дело 2 — бонус, если останется время.</p></div>' + cards + '</div>';
+  }
+
+  function nightBoard(item) {
+    var now = state.bits[item.id];
+      return '<div class="version-grid no-swipe">' + NIGHTS.map(function (night) {
+      var on = bit(now.a) === night.a && bit(now.b) === night.b;
+      return '<button type="button" class="version-card' + (on ? ' is-on' : '') + '" data-action="set-row" data-case="' + item.id + '" data-a="' + night.a + '" data-b="' + night.b + '" aria-pressed="' + (on ? 'true' : 'false') + '"><span class="kicker">A=' + night.a + ' · B=' + night.b + '</span><strong>' + esc(night.title) + '</strong><span class="note">' + esc(night.line) + '</span><span class="who-row"><i class="' + (night.a ? 'is-hot' : '') + '">А</i><i class="' + (night.b ? 'is-hot' : '') + '">Б</i></span></button>';
+    }).join('') + '</div>';
+  }
+
+  function meterHtml(okCount, total) {
+    var html = '<div class="meter" aria-hidden="true">';
+    var i;
+    for (i = 0; i < total; i += 1) html += '<i class="' + (i < okCount ? 'is-on' : '') + '"></i>';
+    return html + '</div>';
+  }
+
+  function solvedBoard(item) {
+    var saved = state.solvedCombo[item.id];
+    return '<div class="row-table">' + NIGHTS.map(function (night) {
+      var live = bit(saved.a) === night.a && bit(saved.b) === night.b;
+      var hits = item.clues.filter(function (clue) {
+        return evalExpr(clue.expr, night.a, night.b) === 1;
+      }).length;
+      return '<div class="row-line' + (live ? ' is-live' : '') + '"><span><strong>' + esc(night.title) + '</strong><span class="note"> A=' + night.a + ' B=' + night.b + '</span></span><strong class="' + (live ? 'ok-text' : 'bad-text') + '">' + hits + '/4' + (live ? ' · живая' : '') + '</strong></div>';
+    }).join('') + '</div>';
   }
 
   function verdictHtml(item) {
     if (!state.solved[item.id] || !sameCombo(item.id)) return '';
     var saved = state.solvedCombo[item.id];
-    var lines = [[0, 0], [0, 1], [1, 0], [1, 1]].filter(function (pair) {
-      return pair[0] !== bit(saved.a) || pair[1] !== bit(saved.b);
-    }).map(function (pair) {
-      var failed = [];
-      item.clues.forEach(function (clue, index) {
-        if (evalExpr(clue.expr, pair[0], pair[1]) === 0) failed.push('улика ' + (index + 1) + ' (' + FORMULA[clue.expr] + ')');
-      });
-      return '<p class="note">' + esc(describe(pair[0], pair[1])) + ': ломается ' + esc(failed.join(', ')) + '.</p>';
-    }).join('');
     var gain = state.caseGain ? '<p class="kicker">+' + state.caseGain + ' XP</p>' : '';
-    return '<section class="card is-green">' + gain + '<p class="kicker">Дело закрыто</p><h2>' + esc(describe(saved.a, saved.b)) + '</h2><p class="lead">' + esc(item.closing) + '</p>' + lines + '</section>';
+    return '<section class="card is-green">' + gain + '<p class="kicker">Протокол</p><h2>' + esc(describe(saved.a, saved.b)) + '</h2><p class="lead">' + esc(item.closing) + '</p></section>';
+  }
+
+  function drillTasks(item) {
+    var model = satisfying(item)[0];
+    var first = item.clues[0];
+    var second = item.clues[1];
+    var fail = null;
+    [[0, 0], [0, 1], [1, 0], [1, 1]].forEach(function (pair) {
+      if (fail) return;
+      if (evalExpr(second.expr, pair[0], pair[1]) === 0) fail = pair;
+    });
+    return [
+      { a: model[0], b: model[1], expr: first.expr, prompt: first.text, expect: evalExpr(first.expr, model[0], model[1]) },
+      { a: fail[0], b: fail[1], expr: second.expr, prompt: second.text, expect: evalExpr(second.expr, fail[0], fail[1]) }
+    ];
+  }
+
+  function drillHtml(item) {
+    if (!state.solved[item.id]) return '';
+    if (!state.drill || state.drill.caseId !== item.id) {
+      return '<section class="card is-cyan"><p class="kicker">Закрепление</p><h2>Две карточки по памяти</h2><p class="lead">Как в зачёте: сначала ответ, потом объяснение. Так правило остаётся, а не только кнопка.</p><button type="button" class="primary-btn" data-action="drill-start" data-id="' + item.id + '">Закрепить</button></section>';
+    }
+    if (state.drill.phase === 'done') {
+      var next = item.id === 'c1' && !state.solved.c2
+        ? '<button type="button" class="primary-btn" data-action="open-case" data-id="c2">К бонусному делу</button>'
+        : '';
+      return '<section class="card is-cyan"><p class="kicker">Закрепление</p><h2>' + state.drill.correct + ' из 2</h2><p class="lead">' + (state.drill.correct === 2 ? 'Обе строки вспомнил сам. Ниже — вся таблица дела.' : 'Одну строку ещё плавает. Таблица ниже покажет, какая версия одна живая.') + '</p>' + solvedBoard(item) + '<p class="note">Живая строка — единственная, где все четыре улики равны 1.</p><button type="button" class="ghost-btn" data-action="drill-start" data-id="' + item.id + '">Ещё раз</button>' + next + '</section>';
+    }
+    var task = drillTasks(item)[state.drill.index];
+    var head = '<p class="kicker">Закрепление · ' + (state.drill.index + 1) + ' / 2</p><p class="lead">' + esc(task.prompt) + '</p><p class="formula">' + esc(FORMULA[task.expr]) + '</p><p class="note">Версия A = ' + task.a + ', B = ' + task.b + '. Чему равна улика?</p>';
+    if (state.drill.phase === 'ask') {
+      return '<section class="card is-cyan">' + head + '<div class="answer-row no-swipe"><button type="button" class="answer-btn zero" data-action="drill-pick" data-val="0"><span class="big">0</span><span class="cap">ложь</span></button><button type="button" class="answer-btn one" data-action="drill-pick" data-val="1"><span class="big">1</span><span class="cap">истина</span></button></div></section>';
+    }
+    var ok = state.drill.pick === task.expect;
+    return '<section class="card ' + (ok ? 'is-green' : 'is-pink') + '"><p class="verdict-word ' + (ok ? 'ok-text' : 'bad-text') + '">' + (ok ? 'ВЕРНО' : 'НЕВЕРНО') + '</p>' + head + '<p class="lead">Верно: ' + task.expect + '. ' + esc(clueVoice(task.expr, task.a, task.b, task.expect === 1)) + '</p><button type="button" class="primary-btn" data-action="drill-next">' + (state.drill.index === 1 ? 'К итогу закрепления' : 'Следующая карточка') + '</button></section>';
   }
 
   function cluesHtml(item) {
@@ -1307,7 +1406,7 @@
     return item.clues.map(function (clue, index) {
       var value = evalExpr(clue.expr, now.a, now.b);
       var good = value === 1;
-      return '<article class="card ' + (good ? 'is-green' : 'is-pink') + '"><div class="clue-top"><span class="kicker">Улика ' + (index + 1) + '</span><strong class="' + (good ? 'ok-text' : 'bad-text') + '">' + (good ? 'сошлась · 1' : 'не сходится · 0') + '</strong></div><p class="lead">' + esc(clue.text) + '</p><p class="clue-formula">' + esc(FORMULA[clue.expr]) + '</p></article>';
+      return '<article class="card ' + (good ? 'is-green' : 'is-pink') + '"><div class="clue-top"><span class="kicker">Улика ' + (index + 1) + '</span><strong class="' + (good ? 'ok-text' : 'bad-text') + '">' + (good ? 'сошлась · 1' : 'спорит · 0') + '</strong></div><p class="lead">' + esc(clue.text) + '</p><p class="clue-formula">' + esc(FORMULA[clue.expr]) + '</p><p class="note">' + esc(clueVoice(clue.expr, now.a, now.b, good)) + '</p></article>';
     }).join('');
   }
 
@@ -1320,22 +1419,29 @@
     var ready = okCount === item.clues.length;
     var enabled = ready && !solved;
     var buttonLabel = solved && ready ? 'Уже в деле' : 'Арестовать';
+    var almost = !ready && okCount === item.clues.length - 1
+      ? '<p class="callout">Почти. Одна улика ещё красная — прочитай, с чем она спорит, и смени версию.</p>'
+      : '';
     var hint = state.hint
-      ? '<p class="lead">Зелёная улика значит: формула сейчас равна 1. Красная — равна 0, эта пара не подходит. Пар всего четыре. Когда все улики зелёные, кнопка «Арестовать» загорится. Ответ вслух она не говорит — его собираешь ты.</p>'
+      ? '<p class="lead">Зелёная улика: формула этой версии равна 1. Красная: равна 0, версия не подходит. Версий четыре, как строк в таблице. Когда все улики зелёные, загорится «Арестовать».</p>'
       : '';
     var restore = solved && !sameCombo(item.id)
       ? '<button type="button" class="ghost-btn" data-action="restore-case" data-id="' + item.id + '">Вернуть версию, которая закрыла дело</button>'
       : '';
-    return '<div class="stack-lg"><button type="button" class="ghost-btn" data-action="close-case">Все дела</button><div><p class="kicker">' + esc(item.code) + '</p><h1>' + esc(item.title) + '</h1><p class="lead">' + esc(item.lead) + '</p><p class="note">Вариантов четыре — как строк в таблице на два высказывания.</p></div>' +
-      (solved ? '<p class="kicker">Дело уже закрыто</p>' : '') +
+    var night = NIGHTS.filter(function (row) {
+      return row.a === bit(now.a) && row.b === bit(now.b);
+    })[0];
+    return '<div class="stack-lg"><button type="button" class="ghost-btn" data-action="close-case">Все досье</button><div><p class="kicker">' + esc(item.place) + '</p><h1>' + esc(item.title) + '</h1><p class="lead">' + esc(item.lead) + '</p></div>' +
+      (solved ? '<p class="stamp is-big">Дело закрыто</p>' : '') +
       verdictHtml(item) +
-      '<section class="card"><div class="suspect-top"><h2>Алиса</h2><span class="symbol">A</span></div>' + bitSeg('set-bit', 'a', bit(now.a), item.id) + '</section>' +
-      '<section class="card"><div class="suspect-top"><h2>Боб</h2><span class="symbol">B</span></div>' + bitSeg('set-bit', 'b', bit(now.b), item.id) + '</section>' +
+      '<section class="card"><h2>Версии ночи</h2><p class="note">Нажми одну. Сейчас: ' + esc(night ? night.title : '') + '.</p>' + nightBoard(item) + '</section>' +
       '<p class="lead" aria-live="polite">Сошлось ' + okCount + ' из ' + item.clues.length + '</p>' +
-      '<p class="note">Красная улика = сейчас 0. Зелёная = сейчас 1.</p>' +
+      meterHtml(okCount, item.clues.length) +
+      almost +
       '<button type="button" class="ghost-btn" data-action="hint">' + (state.hint ? 'Скрыть подсказку' : 'Как читать улики') + '</button>' + hint +
       cluesHtml(item) +
-      '<p class="note">' + (ready ? 'Все улики сошлись. Можно брать.' : 'Кнопка включится, когда все улики станут зелёными.') + '</p>' +
+      drillHtml(item) +
+      '<p class="note">' + (ready ? 'Все улики зелёные. Можно закрывать дело.' : 'Кнопка включится, когда все четыре улики станут зелёными.') + '</p>' +
       '<button type="button" class="primary-btn' + (enabled ? ' ready' : '') + '" data-action="arrest" data-id="' + item.id + '"' + (enabled ? '' : ' disabled') + '>' + buttonLabel + '</button>' +
       restore + '</div>';
   }
@@ -1585,12 +1691,12 @@
     render();
   }
 
-  function setBit(caseId, who, val) {
-    if (!state.bits[caseId] || (who !== 'a' && who !== 'b')) return;
+  function setRow(caseId, a, b) {
+    if (!state.bits[caseId]) return;
     var item = caseById(caseId);
     if (!item) return;
     var before = allGreen(item);
-    state.bits[caseId][who] = val ? 1 : 0;
+    state.bits[caseId] = { a: bit(a), b: bit(b) };
     var after = allGreen(item);
     if (!before && after && !state.solved[caseId]) haptic([30, 40, 30]);
     render({ scroll: 'keep' });
@@ -1603,6 +1709,7 @@
     state.solved[id] = true;
     state.solvedCombo[id] = { a: bit(now.a), b: bit(now.b) };
     state.caseGain = award('case-' + id, 50);
+    state.drill = { caseId: id, index: 0, phase: 'ask', correct: 0, pick: null };
     save();
     haptic([40, 50, 40]);
     playOk();
@@ -1732,8 +1839,49 @@
       render();
       return;
     }
+    if (action === 'set-row') {
+      setRow(node.getAttribute('data-case'), node.getAttribute('data-a'), node.getAttribute('data-b'));
+      return;
+    }
+    if (action === 'drill-start') {
+      state.drill = { caseId: node.getAttribute('data-id'), index: 0, phase: 'ask', correct: 0, pick: null };
+      render({ scroll: 'keep' });
+      return;
+    }
+    if (action === 'drill-pick') {
+      if (!state.drill || state.drill.phase !== 'ask') return;
+      var drillItem = caseById(state.drill.caseId);
+      var drillTask = drillTasks(drillItem)[state.drill.index];
+      state.drill.pick = Number(node.getAttribute('data-val')) ? 1 : 0;
+      state.drill.phase = 'result';
+      if (state.drill.pick === drillTask.expect) {
+        state.drill.correct += 1;
+        haptic(40);
+        playOk();
+      } else {
+        playBad();
+      }
+      render({ scroll: 'keep' });
+      return;
+    }
+    if (action === 'drill-next') {
+      if (!state.drill || state.drill.phase !== 'result') return;
+      if (state.drill.index >= 1) state.drill.phase = 'done';
+      else {
+        state.drill.index += 1;
+        state.drill.phase = 'ask';
+        state.drill.pick = null;
+      }
+      render({ scroll: 'keep' });
+      return;
+    }
     if (action === 'set-bit') {
-      setBit(node.getAttribute('data-case'), node.getAttribute('data-who'), Number(node.getAttribute('data-val')));
+      var caseId = node.getAttribute('data-case');
+      var who = node.getAttribute('data-who');
+      if (!state.bits[caseId] || (who !== 'a' && who !== 'b')) return;
+      var nextBits = { a: state.bits[caseId].a, b: state.bits[caseId].b };
+      nextBits[who] = Number(node.getAttribute('data-val')) ? 1 : 0;
+      setRow(caseId, nextBits.a, nextBits.b);
       return;
     }
     if (action === 'hint') {
@@ -1907,6 +2055,7 @@
       process.exit(1);
     }
     state = blank();
+    if (bit('0') !== 0 || bit('1') !== 1 || bit(0) !== 0) problems.push('bit string');
     function put(id, best, total) {
       state.levels[id] = { stars: starsFor(best, total), best: best, total: total, done: true, passed: best >= needCount(total) };
     }
