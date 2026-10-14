@@ -814,7 +814,9 @@ input::placeholder { color: #9fb6c9; }
   font-weight: 700;
 }
 
+.wait-bit { color: #ffd56a; }
 .mark { color: var(--green); }
+.mark.wait { color: var(--cyan); }
 .mark.wait { color: var(--cyan); }
 
 .clue-formula {

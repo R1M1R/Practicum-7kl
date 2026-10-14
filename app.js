@@ -533,7 +533,8 @@
       screen: 'boot',
       tab: 'base',
       openAcc: '',
-      play: { a: 0, b: 1 },
+      play: { a: 0, b: 1, guess: null },
+      seenPlay: {},
       run: null,
       caseId: null,
       bits: { c1: { a: 0, b: 0 }, c2: { a: 0, b: 0 } },
@@ -1008,20 +1009,38 @@
     return '<div class="seg no-swipe">' + btn(0, zeroLabel, zeroCls) + btn(1, oneLabel, oneCls) + '</div>';
   }
 
+  function playKey(id, a, b, unary) {
+    return id + ':' + bit(a) + ':' + (unary ? 'u' : bit(b));
+  }
+
   function playBlock(op) {
-    var a = state.play.a ? 1 : 0;
-    var b = state.play.b ? 1 : 0;
+    var a = bit(state.play.a);
+    var b = bit(state.play.b);
     var value = evalExpr(op.expr, a, b);
-    var rows = tableRows(op.expr, op.unary).map(function (row) {
+    var rows = tableRows(op.expr, op.unary);
+    var opened = 0;
+    var table = rows.map(function (row) {
       var current = op.unary ? row.a === a : (row.a === a && row.b === b);
-      var trap = op.id === 'impl' && row.a === 1 && row.b === 0;
+      var revealed = !!state.seenPlay[playKey(op.id, row.a, row.b == null ? 0 : row.b, op.unary)];
+      if (revealed) opened += 1;
+      var trap = revealed && op.id === 'impl' && row.a === 1 && row.b === 0;
       var left = op.unary ? ('A = ' + row.a) : ('A = ' + row.a + ', B = ' + row.b);
-      return '<div class="mini-row' + (current ? ' is-current' : '') + '"><span>' + left + (trap ? ' · единственная ложь' : '') + '</span><strong class="' + (row.v ? 'ok-text' : 'bad-text') + '">' + row.v + '</strong></div>';
+      var mark = revealed ? row.v : '?';
+      return '<div class="mini-row' + (current ? ' is-current' : '') + '"><span>' + left + (trap ? ' · единственная ложь' : '') + '</span><strong class="' + (revealed ? (row.v ? 'ok-text' : 'bad-text') : 'wait-bit') + '">' + mark + '</strong></div>';
     }).join('');
+    var asking = state.play.guess == null && !state.seenPlay[playKey(op.id, a, b, op.unary)];
+    var verdict = '';
+    if (state.play.guess != null) {
+      var ok = state.play.guess === value;
+      verdict = '<p class="verdict-word ' + (ok ? 'ok-text' : 'bad-text') + '">' + (ok ? 'ВЕРНО' : 'НЕВЕРНО') + '</p><p class="note">' + (ok ? 'Строка открыта.' : 'Верно ' + value + '. ' + esc(op.rule)) + '</p>';
+    }
+    var result = asking
+      ? '<p class="lead">Какой результат у этой строки?</p><div class="answer-row no-swipe"><button type="button" class="answer-btn zero" data-action="play-pick" data-val="0"><span class="big">0</span><span class="cap">ложь</span></button><button type="button" class="answer-btn one" data-action="play-pick" data-val="1"><span class="big">1</span><span class="cap">истина</span></button></div>'
+      : '<div class="play-result">' + verdict + '<span>Результат ' + esc(op.symbol) + '</span><strong class="' + (value ? 'ok-text' : 'bad-text') + '">' + value + '</strong><span>' + (value ? 'истина' : 'ложь') + '</span></div>';
     var bControl = op.unary ? '' : '<div><p class="note">Вход B</p>' + bitSeg('set-play', 'b', b) + '</div>';
     return '<div class="stack"><p class="note">Вход A</p>' + bitSeg('set-play', 'a', a) + bControl +
-      '<div class="play-result"><span>Результат ' + esc(op.symbol) + '</span><strong class="' + (value ? 'ok-text' : 'bad-text') + '">' + value + '</strong><span>' + (value ? 'истина' : 'ложь') + '</span></div>' +
-      rows + '<p class="note">Входы A и B общие для всех операций. Открой соседнюю карточку — комбинация та же, результат другой.</p></div>';
+      result + meterHtml(opened, rows.length) + '<p class="note">Открыто ' + opened + ' из ' + rows.length + ' строк. Сначала ответ, потом цифра.</p>' +
+      table + '<p class="note">Входы A и B общие. Открой соседнюю операцию — комбинация та же, таблица другая.</p></div>';
   }
 
   function handbookHtml() {
@@ -1068,7 +1087,7 @@
       '<div class="auto-grid"><section class="card is-cyan"><p class="kicker">Урок 1</p><h2>Базовые операции</h2><p class="lead">НЕ, И, ИЛИ, XOR. Потом радар: по таблице узнать, чья она.</p><p class="note">' + lessonCount(['not', 'and', 'or', 'xor', 'radar']) + '</p><button type="button" class="primary-btn" data-action="tab" data-tab="train">К шлюзам</button></section>' +
       '<section class="card"><p class="kicker">Урок 2</p><h2>Если, улики, оценка</h2><p class="lead">Следование, составные формулы, переводчик фраз и дело про Алису с Бобом.</p><p class="note">' + lessonCount(['impl', 'eq', 'mix', 'exam', 'translate']) + '</p><button type="button" class="ghost-btn" data-action="tab" data-tab="case">К делу</button></section></div>' +
       '<section class="card"><h2>План</h2>' + checklistHtml() + '</section>' +
-      '<div><h2>Протокол</h2><p class="lead">Нажми операцию, подвигай A и B и смотри подсвеченную строку. На первом уроке хватит верхних четырёх. Следование открой на втором.</p>' + handbookHtml() + '</div>' +
+      '<div><h2>Протокол</h2><p class="lead">Нажми операцию и угадай строку, пока вместо цифры стоит вопрос. На первом уроке хватит НЕ, И, ИЛИ и XOR. Следование открой на втором.</p>' + handbookHtml() + '</div>' +
       '<p class="note">Разделы внизу. На широком экране карточки встают в два столбца.</p>' +
       '<button type="button" class="ghost-btn" data-action="rename">Сменить позывной</button></div>';
   }
@@ -1794,7 +1813,30 @@
       var who = node.getAttribute('data-who');
       if (who !== 'a' && who !== 'b') return;
       state.play[who] = Number(node.getAttribute('data-val')) ? 1 : 0;
+      state.play.guess = null;
       state.handbook = true;
+      save();
+      render({ scroll: 'keep' });
+      return;
+    }
+    if (action === 'play-pick') {
+      var op = null;
+      OPS.forEach(function (item) {
+        if (item.id === state.openAcc) op = item;
+      });
+      if (!op || state.play.guess != null) return;
+      var playA = bit(state.play.a);
+      var playB = bit(state.play.b);
+      var right = evalExpr(op.expr, playA, playB);
+      state.play.guess = Number(node.getAttribute('data-val')) ? 1 : 0;
+      state.seenPlay[playKey(op.id, playA, playB, op.unary)] = true;
+      state.handbook = true;
+      if (state.play.guess === right) {
+        haptic(40);
+        playOk();
+      } else {
+        playBad();
+      }
       save();
       render({ scroll: 'keep' });
       return;
