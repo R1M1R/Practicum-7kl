@@ -1131,6 +1131,33 @@
     return html + '</div>';
   }
 
+  function sameInput(task, row, unary) {
+    if (bit(task.a) !== row.a) return false;
+    if (unary) return true;
+    return bit(task.b) === row.b;
+  }
+
+  function fillStrip(level, task, revealCurrent) {
+    var unary = isUnary(task.expr);
+    var rows = tableRows(task.expr, unary);
+    var html = rows.map(function (row) {
+      var current = sameInput(task, row, unary);
+      var known = false;
+      var i;
+      for (i = 0; i < state.run.index; i += 1) {
+        var prev = level.tasks[i];
+        if (!prev || prev.kind === 'choice' || prev.expr !== task.expr) continue;
+        if (sameInput(prev, row, unary)) known = true;
+      }
+      var show = (current && revealCurrent) || (!current && known);
+      var mark = show ? row.v : '?';
+      var left = unary ? ('A = ' + row.a) : ('A = ' + row.a + ', B = ' + row.b);
+      var tone = show ? (row.v ? 'ok-text' : 'bad-text') : 'wait-bit';
+      return '<div class="mini-row' + (current ? ' is-current' : '') + '"><span>' + left + '</span><strong class="' + tone + '">' + mark + '</strong></div>';
+    }).join('');
+    return '<div class="fill-strip"><p class="note">Таблица ' + esc(FORMULA[task.expr]) + '. Знак вопроса — строка, которую ещё не открывал.</p>' + html + '</div>';
+  }
+
   function bitsHtml(task) {
     var html = '<div class="bits"><div class="bit ' + (task.a ? 'is-one' : 'is-zero') + '"><span>A</span><strong>' + bit(task.a) + '</strong></div>';
     if (!isUnary(task.expr)) {
@@ -1200,7 +1227,7 @@
       : '';
     var streak = state.run.streak >= 2 ? '<p class="kicker">Серия ' + state.run.streak + '</p>' : '';
     var controls = locked ? '<p class="lead">Сверяю ответ…</p>' : answerButtons();
-    return '<div class="shake-wrap"><article class="card flip-card"><p class="kicker">' + esc(level.code) + ' · ' + esc(level.name) + ' · ' + (state.run.index + 1) + ' / ' + level.tasks.length + '</p>' + streak + dotsHtml(state.run.index, level.tasks.length) + examNote + bitsHtml(task) + '<p class="formula">' + esc(FORMULA[task.expr]) + '</p>' + extra + coach + controls + exitButton() + '</article></div>';
+    return '<div class="shake-wrap"><article class="card flip-card"><p class="kicker">' + esc(level.code) + ' · ' + esc(level.name) + ' · ' + (state.run.index + 1) + ' / ' + level.tasks.length + '</p>' + streak + dotsHtml(state.run.index, level.tasks.length) + examNote + bitsHtml(task) + '<p class="formula">' + esc(FORMULA[task.expr]) + '</p>' + fillStrip(level, task, false) + extra + coach + controls + exitButton() + '</article></div>';
   }
 
   function resultCard(level) {
@@ -1211,7 +1238,7 @@
     var last = state.run.index === level.tasks.length - 1;
     var bonus = ok && state.run.streak > 0 && state.run.streak % 3 === 0 ? '<p class="kicker">Серия ' + state.run.streak + ' · бонус</p>' : '';
     var gain = state.run.gained ? '<p class="note">+' + state.run.gained + ' XP</p>' : '';
-    return '<article class="card flip-card is-in ' + (ok ? 'is-green' : 'is-pink') + '"><p class="verdict-word ' + (ok ? 'ok-text' : 'bad-text') + '">' + (ok ? 'ВЕРНО' : 'НЕВЕРНО') + '</p>' + bonus + '<p class="lead">Ты выбрал ' + state.run.pick + '. Верно: ' + right + '.</p><p class="formula">' + esc(pretty(task.expr, task.a, task.b)) + '</p><p class="lead">' + esc(task.why) + '</p>' + gain + '<button type="button" class="primary-btn" data-action="next-card">' + (last ? 'К разбору шлюза' : 'Следующая карта') + '</button>' + exitButton() + '</article>';
+    return '<article class="card flip-card is-in ' + (ok ? 'is-green' : 'is-pink') + '"><p class="verdict-word ' + (ok ? 'ok-text' : 'bad-text') + '">' + (ok ? 'ВЕРНО' : 'НЕВЕРНО') + '</p>' + bonus + '<p class="lead">Ты выбрал ' + state.run.pick + '. Верно: ' + right + '.</p><p class="formula">' + esc(pretty(task.expr, task.a, task.b)) + '</p>' + fillStrip(level, task, true) + '<p class="lead">' + esc(task.why) + '</p>' + gain + '<button type="button" class="primary-btn" data-action="next-card">' + (last ? 'К разбору шлюза' : 'Следующая карта') + '</button>' + exitButton() + '</article>';
   }
 
   function canonicalTable(level) {

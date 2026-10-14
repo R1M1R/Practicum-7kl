@@ -752,6 +752,11 @@ input::placeholder { color: #9fb6c9; }
   background: rgba(122, 239, 255, 0.08);
 }
 
+.fill-strip .mini-row.is-current {
+  border-color: #ffd56a;
+  background: rgba(255, 213, 106, 0.1);
+}
+
 .play-result {
   margin: 0.8rem 0;
   text-align: center;
