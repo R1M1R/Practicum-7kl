@@ -513,6 +513,11 @@ input::placeholder { color: #9fb6c9; }
   box-shadow: 0 0 0 1px rgba(93, 255, 176, 0.35), var(--shadow);
 }
 
+.choice-card.is-done {
+  border-color: rgba(93, 255, 176, 0.55);
+  background: linear-gradient(180deg, rgba(18, 48, 36, 0.35), rgba(14, 22, 34, 0.92));
+}
+
 .choice-top, .row-between, .suspect-top, .clue-top {
   display: flex;
   justify-content: space-between;

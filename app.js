@@ -481,6 +481,7 @@
         if (got !== task.expect) problems.push(level.id + '#' + index + ' got ' + got + ' expect ' + task.expect);
         if (!known[task.expr]) problems.push('formula ' + task.expr);
         if (!task.why) problems.push('why ' + level.id + index);
+        if (!ruleLine(task.expr)) problems.push('rule ' + task.expr);
       });
     });
     CASES.forEach(function (item) {
@@ -1094,7 +1095,7 @@
 
   function levelButton(level) {
     var pack = state.levels[level.id];
-    var cls = 'choice-card' + (level.id === recommendedId() ? ' is-next' : '');
+    var cls = 'choice-card' + (level.id === recommendedId() ? ' is-next' : '') + (pack && pack.done ? ' is-done' : '');
     var badge = level.key ? '<span class="badge">ключевой</span>' : '';
     var status = 'не пройден';
     var statusClass = 'note';
@@ -1202,7 +1203,7 @@
     }
     var hint = level.hint ? '<p class="note">' + esc(level.hint) + '</p>' : '';
     var controls = locked ? '<p class="lead">Сверяю ответ…</p>' : choiceButtons(task);
-    return '<div class="shake-wrap"><article class="card flip-card"><p class="kicker">' + esc(level.code) + ' · ' + esc(level.name) + ' · ' + (state.run.index + 1) + ' / ' + level.tasks.length + '</p>' + dotsHtml(state.run.index, level.tasks.length) + body + hint + controls + exitButton() + '</article></div>';
+    return '<div class="shake-wrap"><article class="card flip-card"><p class="kicker">' + esc(level.code) + ' · ' + esc(level.name) + ' · ' + (state.run.index + 1) + ' / ' + level.tasks.length + '</p>' + dotsHtml(state.run.index, level.tasks.length) + body + hint + missCoach(level) + controls + exitButton() + '</article></div>';
   }
 
   function choiceResult(level, task) {
@@ -1212,22 +1213,55 @@
     return '<article class="card flip-card is-in ' + (ok ? 'is-green' : 'is-pink') + '"><p class="verdict-word ' + (ok ? 'ok-text' : 'bad-text') + '">' + (ok ? 'ВЕРНО' : 'НЕВЕРНО') + '</p><p class="lead">Ты выбрал: ' + esc(labelOf(task, state.run.pick)) + '.</p><p class="formula">' + esc(labelOf(task, task.answer)) + '</p><p class="lead">' + esc(task.why) + '</p>' + gain + '<button type="button" class="primary-btn" data-action="next-card">' + (last ? 'К разбору' : 'Следующая карта') + '</button>' + exitButton() + '</article>';
   }
 
+  function ruleLine(expr) {
+    var lines = {
+      not: 'НЕ переворачивает бит: 0 становится 1, а 1 становится 0.',
+      notnot: 'Два НЕ подряд возвращают исходный бит.',
+      and: 'И равно 1, только если оба входа равны 1.',
+      or: 'ИЛИ равно 0, только если оба входа равны 0.',
+      xor: 'XOR равен 1, только когда биты разные.',
+      impl: 'Следование ложно только когда слева 1, а справа 0.',
+      eq: 'Эквивалентность равна 1, когда биты одинаковые.',
+      notA_or_B: 'Сначала переверни A, потом соедини с B через ИЛИ.',
+      nand: 'Сначала И, потом переверни результат.',
+      impl_notB: 'Сначала переверни B, потом проверь следование.',
+      eq_nots: 'Переверни оба бита и сравни, одинаковые ли они.',
+      xor_notB: 'Переверни B и смотри, разные ли биты.',
+      or_and_notA: 'Сначала скобки с ИЛИ, потом И с перевёрнутым A.',
+      nor: 'Сначала ИЛИ, потом переверни результат.',
+      notA_and_B: 'Переверни A и соедини с B через И.'
+    };
+    return lines[expr] || '';
+  }
+
+  function missCoach(level) {
+    if (level.hideHint || !state.run || !state.run.misses.length) return '';
+    var last = state.run.misses[state.run.misses.length - 1];
+    var missed = level.tasks[last.index];
+    if (!missed) return '';
+    if (missed.kind === 'choice' && level.id === 'radar') {
+      return '<p class="callout">После промаха: смотри, где единственная единица и есть ли второй вход.</p>';
+    }
+    if (missed.kind === 'choice' && level.id === 'translate') {
+      return '<p class="callout">После промаха: «оба», «хотя бы один», «ровно один» и «если… то…» — разные знаки.</p>';
+    }
+    var line = ruleLine(missed.expr);
+    if (!line) return '';
+    return '<p class="callout">После промаха: ' + esc(line) + '</p>';
+  }
+
   function askCard(level, locked) {
     var task = level.tasks[state.run.index];
     if (task.kind === 'choice') return choiceAsk(level, task, locked);
     var extra = task.callout
       ? '<p class="callout">' + esc(task.callout) + '</p>'
       : (!level.hideHint && level.hint ? '<p class="lead">' + esc(level.hint) + '</p>' : '');
-    var coach = '';
-    if (state.run.misses.length && (level.id === 'impl' || task.expr === 'impl' || task.expr === 'impl_notB')) {
-      coach = '<p class="callout">После промаха: следование ложно только когда слева 1, а справа 0.</p>';
-    }
     var examNote = level.hideHint && state.run.index === 0
       ? '<p class="note">Зачёт без подсказки на карте. Нужно минимум ' + needCount(level.tasks.length) + ' из ' + level.tasks.length + '.</p>'
       : '';
     var streak = state.run.streak >= 2 ? '<p class="kicker">Серия ' + state.run.streak + '</p>' : '';
     var controls = locked ? '<p class="lead">Сверяю ответ…</p>' : answerButtons();
-    return '<div class="shake-wrap"><article class="card flip-card"><p class="kicker">' + esc(level.code) + ' · ' + esc(level.name) + ' · ' + (state.run.index + 1) + ' / ' + level.tasks.length + '</p>' + streak + dotsHtml(state.run.index, level.tasks.length) + examNote + bitsHtml(task) + '<p class="formula">' + esc(FORMULA[task.expr]) + '</p>' + fillStrip(level, task, false) + extra + coach + controls + exitButton() + '</article></div>';
+    return '<div class="shake-wrap"><article class="card flip-card"><p class="kicker">' + esc(level.code) + ' · ' + esc(level.name) + ' · ' + (state.run.index + 1) + ' / ' + level.tasks.length + '</p>' + streak + dotsHtml(state.run.index, level.tasks.length) + examNote + bitsHtml(task) + '<p class="formula">' + esc(FORMULA[task.expr]) + '</p>' + fillStrip(level, task, false) + extra + missCoach(level) + controls + exitButton() + '</article></div>';
   }
 
   function resultCard(level) {
